@@ -33,7 +33,7 @@ The core demo loop is:
 
 Cristóvão deliberately separates **source registration** from **claim verification**. A government URL alone is not enough to mark a consequential journey node as supported.
 
-The independent verifier checks for:
+The verifier gates are:
 
 1. HTTPS transport.
 2. An allowed authoritative domain for primary evidence.
@@ -46,41 +46,67 @@ Only when every required check passes can an attached evidence record become `ve
 
 ### Source Intelligence
 
-Cristóvão now has an executable official-source watcher rather than a simulated-only policy update.
-
 Run:
 
 ```bash
 npm run sources:snapshot
 ```
 
-The watcher:
+The watcher fetches registered official sources, snapshots and hashes them, extracts text from the State Department PDF fallback, and deterministically matches configured passages. For the August 2026 Visa Bulletin prototype, the matcher isolates the EB-2 India Final Action value, Dates-for-Filing value, and the EB-2 availability warning.
 
-1. fetches registered official sources,
-2. extracts and normalizes main page text,
-3. computes a SHA-256 content hash,
-4. retains the previous local snapshot,
-5. detects first-seen / unchanged / changed states,
-6. stores a small human-readable change summary,
-7. writes `public/source-intelligence.json`, and
-8. propagates a changed source only to JourneyGraph nodes declared as dependent on that source.
+A source change propagates only to JourneyGraph nodes declared as dependent on that source. Fetch errors are recorded instead of silently substituting stale or invented content.
 
-A successful snapshot supplies freshness, source version, and content hash to the Evidence Engine. It **does not** automatically mark a policy claim verified; matched passages and independent semantic support remain separate gates.
+If automated State Department retrieval is blocked, use the browser-assisted official-file import:
 
-Fetch errors are captured as source status instead of silently falling back to stale or invented content.
+```bash
+npm run sources:import -- visa-bulletin-2026-08 "<path-to-official-file>"
+```
 
-Local snapshot state is stored under `data/source-snapshots/` and ignored by Git. The state directory can be overridden with `SOURCE_STATE_DIR`, which is intended for a persistent volume or object-backed implementation when this worker moves to Render Workflows.
+### Independent semantic verifier
+
+The deterministic matcher proves that a passage was located; it does **not** decide whether that passage semantically proves a claim. That is a separate agent responsibility.
+
+Cristóvão uses the Gemini API only as an independent claim-to-passage classifier. The verifier receives the claim plus its already-matched official passage and is explicitly instructed not to use outside knowledge, make eligibility decisions, predict approval, or provide legal advice.
+
+Set a Gemini API key and run:
+
+```bash
+npm run sources:verify
+```
+
+PowerShell example:
+
+```powershell
+$env:GEMINI_API_KEY="YOUR_KEY"
+npm run sources:verify
+```
+
+Optional model override:
+
+```powershell
+$env:GEMINI_MODEL="gemini-3.6-flash"
+```
+
+Each claim receives one structured verdict:
+
+- `supported`
+- `contradicted`
+- `uncertain`
+
+An API/runtime failure is stored as `not-run`; it is never converted into an AI judgment. The source-level semantic result is deterministic: any contradiction rejects the source claim set, any uncertainty keeps it under review, and only complete support can satisfy the semantic verification gate.
 
 ### Automated validation
 
-Vitest covers the Journey Compiler, Evidence Engine, and Source Intelligence layer. Tests verify that:
+Vitest covers the Journey Compiler, Evidence Engine, Source Intelligence, and semantic-verdict feed integration. Tests verify that:
 
 - critical dates are not invented,
 - what-if impact is limited to connected nodes,
 - official-source registration alone does **not** verify a journey node,
 - all evidence checks are required before verification,
 - contradictory evidence rejects a consequential node,
-- a first source snapshot adds provenance without creating a fake policy change, and
+- a first source snapshot adds provenance without creating a fake policy change,
+- matched passages do not pretend semantic verification ran,
+- semantic verdicts are applied only when actually present, and
 - a real source change propagates only to declared dependent nodes.
 
 GitHub Actions runs unit tests and a production build for pull requests.
@@ -93,6 +119,12 @@ npm run sources:snapshot
 npm run dev
 ```
 
+Run semantic verification after the snapshot has matched passages:
+
+```bash
+npm run sources:verify
+```
+
 Validate:
 
 ```bash
@@ -102,14 +134,13 @@ npm run build
 
 ## Safety / trust model
 
-Cristóvão is an informational navigation and preparation tool, **not legal advice**. High-impact conclusions must be tied to current authoritative evidence and pass independent verification. The system explicitly distinguishes user facts, sourced rules, AI inferences, and unknown information.
+Cristóvão is an informational navigation and preparation tool, **not legal advice**. High-impact conclusions must be tied to current authoritative evidence and pass independent verification. The system explicitly distinguishes user facts, sourced rules, AI inferences, unknown information, deterministic extraction, and AI semantic judgments.
 
 ## Next implementation slices
 
-1. Passage extraction and claim-to-passage matching.
-2. AI semantic verification with structured output and deterministic acceptance rules.
-3. Render Workflow orchestration and persistent source state.
-4. AI structured intake with schema validation.
-5. Synthetic document extraction and cross-document discrepancy detection.
+1. Render Workflow orchestration and persistent source state.
+2. AI structured intake with schema validation.
+3. Synthetic document extraction and cross-document discrepancy detection.
+4. Policy-change semantic diffing and automated re-verification.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the target architecture.
