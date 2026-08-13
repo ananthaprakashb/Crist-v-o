@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { extractPdfText } from './lib/pdfText.mjs';
+import { extractVisaBulletinClaims } from './lib/visaBulletinClaims.mjs';
 
 const registry = {
   'visa-bulletin-2026-08': {
@@ -55,6 +57,11 @@ function validateOfficialFile(bytes, extension) {
   throw new Error('Supported import formats are PDF, HTML, HTM, and TXT.');
 }
 
+async function extractText(bytes, extension) {
+  if (extension === '.pdf') return extractPdfText(bytes);
+  return bytes.toString('utf8').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 await mkdir(stateDir, { recursive: true });
 await mkdir(path.dirname(feedPath), { recursive: true });
 
@@ -67,6 +74,15 @@ const previous = await readJson(path.join(stateDir, `${source.id}.json`), null);
 const changed = Boolean(previous?.contentHash && previous.contentHash !== contentHash);
 const status = !previous?.contentHash ? 'first-snapshot' : changed ? 'changed' : 'unchanged';
 
+let normalizedText = '';
+let extractionError;
+try {
+  normalizedText = await extractText(bytes, extension);
+} catch (error) {
+  extractionError = error instanceof Error ? error.message : String(error);
+}
+const matchedClaims = normalizedText ? extractVisaBulletinClaims(normalizedText) : [];
+
 const state = {
   id: source.id,
   retrievedAt,
@@ -77,6 +93,9 @@ const state = {
   contentType,
   localFileName: path.basename(filePath),
   provenanceNote: 'File was manually downloaded from the official Department of State source because automated retrieval was blocked.',
+  normalizedText: normalizedText ? normalizedText.slice(0, 250000) : undefined,
+  matchedClaims,
+  extractionError,
 };
 await writeFile(path.join(stateDir, `${source.id}.json`), JSON.stringify(state, null, 2));
 
@@ -93,6 +112,8 @@ const record = {
   contentType,
   localFileName: path.basename(filePath),
   provenanceNote: state.provenanceNote,
+  matchedClaims,
+  extractionError,
   affectedNodeIds: source.affectedNodeIds,
   changeSummary: { added: [], removed: [] },
 };
@@ -107,3 +128,5 @@ await writeFile(feedPath, JSON.stringify({ generatedAt: retrievedAt, sources }, 
 console.log(`${source.id}: ${status} ${source.sourceVersion} (browser-assisted official import)`);
 console.log(`hash: ${contentHash}`);
 console.log(`file: ${filePath}`);
+console.log(`matched evidence passages: ${matchedClaims.length}`);
+if (extractionError) console.log(`extraction warning: ${extractionError}`);
