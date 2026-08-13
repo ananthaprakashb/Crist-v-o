@@ -8,6 +8,8 @@
     "noEmit": true,
     "allowJs": true,
     "checkJs": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "types": ["node"]
   },
   "include": ["src/**/*.ts", "../scripts/lib/**/*.mjs"]
