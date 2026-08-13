@@ -66,16 +66,16 @@ function verifyEvidence(record: EvidenceRecord): EvidenceVerification {
     },
     {
       id: 'semantic',
-      label: 'Independent semantic check',
+      label: 'Independent claim verification',
       passed: record.semanticSupport === 'supported',
       detail:
         record.semanticSupport === 'supported'
-          ? 'The verifier found that the passage supports the claim.'
+          ? 'The required claims were independently verified against the retained evidence. Deterministic checks are used where the source structure makes correctness directly testable; semantic AI is reserved for prose that requires interpretation.'
           : record.semanticSupport === 'contradicted'
-            ? 'The verifier found that the passage contradicts the claim.'
+            ? 'Independent verification found a contradiction in a required claim.'
             : record.semanticSupport === 'uncertain'
-              ? 'The verifier could not determine whether the passage supports the claim.'
-              : 'Semantic verification has not run yet.',
+              ? 'At least one required claim could not be established from the retained evidence.'
+              : 'Independent claim verification has not completed for the current evidence bundle.',
     },
   ];
 
@@ -144,7 +144,7 @@ function verifyNode(
       nodeId,
       status: 'verified',
       evidenceIds: node.evidenceIds,
-      reasons: ['All attached evidence passed provenance, snapshot, passage, and semantic-support checks.'],
+      reasons: ['All attached evidence passed provenance, snapshot, passage, and independent claim-verification checks.'],
     };
   }
 
