@@ -15,6 +15,9 @@
     "sources:import": "node scripts/importSourceFile.mjs",
     "sources:verify": "node scripts/verifySourceClaims.mjs",
     "sources:status": "node scripts/sourceStatus.mjs",
+    "server:start": "tsx server/src/index.ts",
+    "server:dev": "tsx watch server/src/index.ts",
+    "server:check": "tsc -p server/tsconfig.json",
     "workflows:start": "tsx workflows/src/index.ts",
     "workflows:dev": "render workflows dev -- npx tsx workflows/src/index.ts",
     "workflows:check": "tsc -p workflows/tsconfig.json"
