@@ -25,4 +25,4 @@ globalThis.fetch = (async (input: URL | RequestInfo, init?: RequestInit) => {
   return nativeFetch(input, { ...init, headers: officialSourceHeaders(inputUrl, init) });
 }) as typeof fetch;
 
-await import('./index.ts');
+await import('./index.js');
