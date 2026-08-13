@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { existsSync, createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { extname, join, normalize, resolve } from 'node:path';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Redis } from 'ioredis';
 
@@ -25,10 +25,16 @@ const mimeTypes: Record<string, string> = {
   '.ico': 'image/x-icon',
 };
 
-function writeJson(response: ServerResponse, status: number, body: unknown) {
+function writeJson(
+  response: ServerResponse,
+  status: number,
+  body: unknown,
+  headers: Record<string, string> = {},
+) {
   response.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
+    ...headers,
   });
   response.end(JSON.stringify(body));
 }
@@ -89,8 +95,9 @@ async function serveStatic(request: IncomingMessage, response: ServerResponse) {
   const candidate = decodedPath === '/' ? 'index.html' : decodedPath.replace(/^\/+/, '');
   const normalizedCandidate = normalize(candidate).replace(/^(\.\.(\/|\\|$))+/, '');
   let filePath = resolve(distDir, normalizedCandidate);
+  const distPrefix = `${distDir}${sep}`;
 
-  if (!filePath.startsWith(`${distDir}/`) && filePath !== distDir) {
+  if (!filePath.startsWith(distPrefix) && filePath !== distDir) {
     response.writeHead(403);
     response.end('Forbidden');
     return;
@@ -120,7 +127,26 @@ const server = createServer(async (request, response) => {
 
   if (request.method === 'GET' && requestUrl.pathname === '/api/evidence/latest') {
     const result = await readLatestFeed();
-    writeJson(response, result.status, result.body);
+    writeJson(
+      response,
+      result.status,
+      result.body,
+      result.ok ? { 'x-cristovao-feed-origin': 'render-key-value' } : {},
+    );
+    return;
+  }
+
+  // The current React app already consumes this contract. In production we make
+  // the same URL live without coupling browser code to Redis or Render internals.
+  if (request.method === 'GET' && requestUrl.pathname === '/source-intelligence.json') {
+    const result = await readLatestFeed();
+    if (result.ok) {
+      writeJson(response, 200, result.body, { 'x-cristovao-feed-origin': 'render-key-value' });
+      return;
+    }
+
+    // Local development and degraded production mode keep the checked-in snapshot.
+    await serveStatic(request, response);
     return;
   }
 
