@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { task } from '@renderinc/sdk/workflows';
 import { GoogleGenAI } from '@google/genai';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { extractPdfText } from '../../scripts/lib/pdfText.mjs';
 import { extractVisaBulletinClaims } from '../../scripts/lib/visaBulletinClaims.mjs';
 import { fingerprintClaims } from '../../scripts/lib/evidenceFingerprint.mjs';
