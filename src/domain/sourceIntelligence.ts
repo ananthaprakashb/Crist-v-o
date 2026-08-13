@@ -43,6 +43,7 @@ export interface SourceFeedRecord {
   semanticVerifications?: SemanticVerificationRecord[];
   semanticVerifierModel?: string;
   semanticVerifiedAt?: string;
+  semanticVerifiedContentHash?: string;
   affectedNodeIds: string[];
   changeSummary?: {
     added: string[];
@@ -96,9 +97,13 @@ export function applySourceIntelligence(
           .join('\n\n');
       }
 
-      if (source.semanticSupport) {
-        evidence.semanticSupport = source.semanticSupport;
-      }
+      const semanticMatchesCurrentSnapshot = Boolean(
+        source.semanticSupport &&
+          source.semanticVerifiedContentHash &&
+          source.contentHash &&
+          source.semanticVerifiedContentHash === source.contentHash,
+      );
+      evidence.semanticSupport = semanticMatchesCurrentSnapshot ? source.semanticSupport! : 'not-run';
     }
 
     if (source.status !== 'changed') continue;
