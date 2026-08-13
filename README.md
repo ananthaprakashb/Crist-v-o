@@ -282,7 +282,7 @@ When required facts or evidence are missing, the correct state is **needs review
 ## Demo assets
 
 - [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) — 3-minute recording / live-demo script
-- [`docs/SCREENSHOT_CHECKLIST.md`](docs/SCREENSHOT_CHECKLIST.md) — exact screenshots to capture for Devpost and the judge deck
+- [`docs/CAPTURE_LIST.md`](docs/CAPTURE_LIST.md) — exact screenshots to capture for the submission and judge deck
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — technical architecture and trust boundaries
 
 ## Current product thesis
