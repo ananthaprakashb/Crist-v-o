@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { evidenceVerificationFor, nodeVerificationFor, verifyJourney } from './domain/evidenceEngine';
 import { applyScenario, compileJourney, readiness } from './domain/journeyCompiler';
 import type { JourneyNode, ScenarioId } from './domain/types';
 
@@ -26,9 +27,13 @@ export default function App() {
   const [scenarioId, setScenarioId] = useState<ScenarioId>('baseline');
   const [selectedNodeId, setSelectedNodeId] = useState('current-profile');
 
-  const scenario = useMemo(() => applyScenario(twin, scenarioId), [twin, scenarioId]);
+  const rawScenario = useMemo(() => applyScenario(twin, scenarioId), [twin, scenarioId]);
+  const verificationResult = useMemo(() => verifyJourney(rawScenario.twin), [rawScenario.twin]);
+  const scenario = { ...rawScenario, twin: verificationResult.twin };
+  const verification = verificationResult.report;
   const score = useMemo(() => readiness(scenario.twin), [scenario.twin]);
-  const selectedNode = scenario.twin.nodes.find((node) => node.id === selectedNodeId) ?? scenario.twin.nodes[0];
+  const selectedNode = scenario.twin.nodes.find((item) => item.id === selectedNodeId) ?? scenario.twin.nodes[0];
+  const selectedVerification = selectedNode ? nodeVerificationFor(verification, selectedNode.id) : undefined;
 
   const buildJourney = () => {
     const nextTwin = compileJourney(input);
@@ -98,9 +103,9 @@ export default function App() {
           <small>{scenarioId === 'baseline' ? 'No simulation active' : scenario.label}</small>
         </article>
         <article className="stat-card score">
-          <span>Journey readiness</span>
-          <strong>{score.journeyReadiness}%</strong>
-          <small>Deterministic demo score</small>
+          <span>Independent verifier</span>
+          <strong>{verification.verifiedNodes}/{verification.totalNodes}</strong>
+          <small>Journey readiness {score.journeyReadiness}%</small>
         </article>
       </section>
 
@@ -140,30 +145,31 @@ export default function App() {
               <p className="eyebrow">03 · JOURNEYGRAPH</p>
               <h2>Your dependency-aware journey</h2>
             </div>
-            <span className="verified-count">{scenario.twin.nodes.filter((node) => node.evidenceStatus === 'supported').length}/{scenario.twin.nodes.length} supported</span>
+            <span className="verified-count">{verification.verifiedNodes}/{verification.totalNodes} independently verified</span>
           </div>
 
           <div className="graph-list">
-            {scenario.twin.nodes.map((node, index) => (
-              <div className="graph-row" key={node.id}>
+            {scenario.twin.nodes.map((item, index) => (
+              <div className="graph-row" key={item.id}>
                 <div className="rail" aria-hidden="true">
                   <span>{index + 1}</span>
                   {index < scenario.twin.nodes.length - 1 && <i />}
                 </div>
                 <button
-                  className={`node-card ${node.impact === 'changed' ? 'changed' : ''} ${selectedNode?.id === node.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedNodeId(node.id)}
+                  className={`node-card ${item.impact === 'changed' ? 'changed' : ''} ${selectedNode?.id === item.id ? 'selected' : ''}`}
+                  onClick={() => setSelectedNodeId(item.id)}
                 >
                   <div className="node-meta">
-                    <span>{kindLabel[node.kind]}</span>
-                    <span className={`evidence-state ${node.evidenceStatus}`}>{node.evidenceStatus}</span>
+                    <span>{kindLabel[item.kind]}</span>
+                    <span className={`evidence-state ${item.evidenceStatus}`}>{item.evidenceStatus}</span>
                   </div>
-                  <h3>{node.title}</h3>
-                  <p>{node.summary}</p>
+                  <h3>{item.title}</h3>
+                  <p>{item.summary}</p>
                   <div className="node-footer">
-                    <span>{node.dependsOn.length} dependencies</span>
-                    <span>{node.affectedPeople.join(', ')}</span>
-                    {node.impact === 'changed' && <strong>IMPACTED</strong>}
+                    <span>{item.dependsOn.length} dependencies</span>
+                    <span>{item.affectedPeople.join(', ')}</span>
+                    <span className={`verification-chip ${item.verificationStatus}`}>{item.verificationStatus}</span>
+                    {item.impact === 'changed' && <strong>IMPACTED</strong>}
                   </div>
                 </button>
               </div>
@@ -178,11 +184,18 @@ export default function App() {
               <h2>{selectedNode.title}</h2>
               <p>{selectedNode.summary}</p>
               <dl>
-                <div><dt>Evidence</dt><dd>{selectedNode.evidenceStatus}</dd></div>
+                <div><dt>Evidence state</dt><dd>{selectedNode.evidenceStatus}</dd></div>
+                <div><dt>Verifier</dt><dd>{selectedNode.verificationStatus}</dd></div>
                 <div><dt>Dependencies</dt><dd>{selectedNode.dependsOn.length || 'Root node'}</dd></div>
-                <div><dt>AI inference</dt><dd>{selectedNode.kind === 'current' ? 'No' : 'Not verified yet'}</dd></div>
+                <div><dt>Evidence records</dt><dd>{selectedNode.evidenceIds.length || 'None'}</dd></div>
                 <div><dt>Impact state</dt><dd>{selectedNode.impact}</dd></div>
               </dl>
+              {selectedVerification && (
+                <div className="verifier-reasons">
+                  <strong>Verifier reasoning</strong>
+                  {selectedVerification.reasons.map((reason) => <span key={reason}>{reason}</span>)}
+                </div>
+              )}
             </>
           )}
 
@@ -203,30 +216,63 @@ export default function App() {
         <div className="section-heading">
           <div>
             <p className="eyebrow">04 · EVIDENCE LEDGER</p>
-            <h2>Facts, rules, inferences, and unknowns stay separate.</h2>
+            <h2>Registration is not verification.</h2>
           </div>
         </div>
+
+        <div className="verifier-summary">
+          <div>
+            <span>INDEPENDENT VERIFIER</span>
+            <strong>{verification.verifiedNodes} of {verification.totalNodes} journey nodes verified</strong>
+          </div>
+          <p>
+            Cristóvão does not count an official URL as proof. Consequential nodes stay unresolved until a specific passage,
+            source version, snapshot hash, and semantic-support check are present.
+          </p>
+        </div>
+
         <div className="evidence-grid">
-          {scenario.twin.evidence.map((record) => (
-            <article key={record.id}>
-              <div>
-                <span className="source-type">OFFICIAL SOURCE</span>
-                <span className="pending">{record.status}</span>
-              </div>
-              <h3>{record.title}</h3>
-              <p>{record.publisher}</p>
-              <a href={record.url} target="_blank" rel="noreferrer">Open source ↗</a>
-            </article>
-          ))}
+          {scenario.twin.evidence.map((record) => {
+            const result = evidenceVerificationFor(verification, record.id);
+            const passed = result?.checks.filter((check) => check.passed).length ?? 0;
+            const total = result?.checks.length ?? 0;
+
+            return (
+              <article key={record.id}>
+                <div>
+                  <span className="source-type">{record.authority.replace('-', ' ').toUpperCase()}</span>
+                  <span className={`verification-chip ${result?.status ?? 'unverified'}`}>{result?.status ?? 'unverified'}</span>
+                </div>
+                <h3>{record.title}</h3>
+                <p>{record.publisher}</p>
+                <div className="evidence-meta">
+                  <span><b>Claim</b>{record.claimType}</span>
+                  <span><b>Match</b>{record.matchStatus}</span>
+                  <span><b>Semantic</b>{record.semanticSupport}</span>
+                  <span><b>Checks</b>{passed}/{total}</span>
+                </div>
+                {record.sourceVersion && <p className="source-version">Version: {record.sourceVersion}</p>}
+                {record.retrievedAt && <p className="source-version">Observed: {record.retrievedAt}</p>}
+                <ul className="check-list">
+                  {result?.checks.map((check) => (
+                    <li className={check.passed ? 'pass' : 'fail'} key={check.id} title={check.detail}>
+                      <span>{check.passed ? '✓' : '○'}</span>{check.label}
+                    </li>
+                  ))}
+                </ul>
+                <a href={record.url} target="_blank" rel="noreferrer">Open source ↗</a>
+              </article>
+            );
+          })}
         </div>
         <p className="evidence-note">
-          Day 1 intentionally marks these records as <strong>pending-match</strong>. A later evidence service must match a current passage and source version before a consequential node is treated as verified.
+          Current official sources are registered, but the prototype intentionally refuses to mark legal or policy claims verified until the retrieval service retains a matched, versioned passage. This is a safety feature, not a missing badge.
         </p>
       </section>
 
       <footer>
         <strong>Cristóvão the Caregiver</strong>
-        <span>Informational navigation, not legal advice. High-impact conclusions require authoritative evidence and verification.</span>
+        <span>Informational navigation, not legal advice. High-impact conclusions require authoritative evidence and independent verification.</span>
       </footer>
     </main>
   );
