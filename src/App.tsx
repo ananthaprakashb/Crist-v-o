@@ -1,6 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { evidenceVerificationFor, nodeVerificationFor, verifyJourney } from './domain/evidenceEngine';
 import { applyScenario, compileJourney, readiness } from './domain/journeyCompiler';
+import {
+  applySourceIntelligence,
+  type SourceIntelligenceFeed,
+} from './domain/sourceIntelligence';
 import type { JourneyNode, ScenarioId } from './domain/types';
 
 const DEFAULT_CASE = `I'm on H-1B. My spouse and child are dependents. My employer started an employment-based green card process, and my child will start college soon. Help me understand what I should prepare and what information you still need.`;
@@ -26,10 +30,39 @@ export default function App() {
   const [twin, setTwin] = useState(() => compileJourney(DEFAULT_CASE));
   const [scenarioId, setScenarioId] = useState<ScenarioId>('baseline');
   const [selectedNodeId, setSelectedNodeId] = useState('current-profile');
+  const [sourceFeed, setSourceFeed] = useState<SourceIntelligenceFeed | null>(null);
+  const [sourceFeedError, setSourceFeedError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    fetch('/source-intelligence.json', { cache: 'no-store' })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Source feed HTTP ${response.status}`);
+        return response.json() as Promise<SourceIntelligenceFeed>;
+      })
+      .then((feed) => {
+        if (active) setSourceFeed(feed);
+      })
+      .catch((error: unknown) => {
+        if (active) setSourceFeedError(error instanceof Error ? error.message : String(error));
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const rawScenario = useMemo(() => applyScenario(twin, scenarioId), [twin, scenarioId]);
-  const verificationResult = useMemo(() => verifyJourney(rawScenario.twin), [rawScenario.twin]);
-  const scenario = { ...rawScenario, twin: verificationResult.twin };
+  const sourceImpact = useMemo(
+    () => applySourceIntelligence(rawScenario.twin, sourceFeed),
+    [rawScenario.twin, sourceFeed],
+  );
+  const verificationResult = useMemo(() => verifyJourney(sourceImpact.twin), [sourceImpact.twin]);
+  const changedNodeIds = useMemo(
+    () => [...new Set([...rawScenario.changedNodeIds, ...sourceImpact.changedNodeIds])],
+    [rawScenario.changedNodeIds, sourceImpact.changedNodeIds],
+  );
+  const scenario = { ...rawScenario, twin: verificationResult.twin, changedNodeIds };
   const verification = verificationResult.report;
   const score = useMemo(() => readiness(scenario.twin), [scenario.twin]);
   const selectedNode = scenario.twin.nodes.find((item) => item.id === selectedNodeId) ?? scenario.twin.nodes[0];
@@ -100,7 +133,7 @@ export default function App() {
         <article className="stat-card">
           <span>Affected nodes</span>
           <strong>{scenario.changedNodeIds.length}</strong>
-          <small>{scenarioId === 'baseline' ? 'No simulation active' : scenario.label}</small>
+          <small>{sourceImpact.changedSourceIds.length > 0 ? 'Live source change detected' : scenarioId === 'baseline' ? 'No change active' : scenario.label}</small>
         </article>
         <article className="stat-card score">
           <span>Independent verifier</span>
@@ -118,11 +151,7 @@ export default function App() {
         </div>
         <div className="scenario-tabs">
           {scenarios.map((item) => (
-            <button
-              className={item.id === scenarioId ? 'active' : ''}
-              key={item.id}
-              onClick={() => setScenarioId(item.id)}
-            >
+            <button className={item.id === scenarioId ? 'active' : ''} key={item.id} onClick={() => setScenarioId(item.id)}>
               {item.label}
             </button>
           ))}
@@ -131,18 +160,54 @@ export default function App() {
         {scenario.questionsRaised.length > 0 && (
           <div className="questions-raised">
             <strong>{scenario.questionsRaised.length} new questions before Cristóvão can conclude:</strong>
-            <ul>
-              {scenario.questionsRaised.map((question) => <li key={question}>{question}</li>)}
-            </ul>
+            <ul>{scenario.questionsRaised.map((question) => <li key={question}>{question}</li>)}</ul>
           </div>
         )}
+      </section>
+
+      <section className="source-intelligence panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">03 · SOURCE INTELLIGENCE</p>
+            <h2>Official pages become versioned inputs.</h2>
+          </div>
+          <span className="safe-label">
+            {sourceFeed?.generatedAt ? `Observed ${new Date(sourceFeed.generatedAt).toLocaleString()}` : 'Snapshot pipeline not run yet'}
+          </span>
+        </div>
+        <p className="source-intro">
+          Run <code>npm run sources:snapshot</code> to fetch registered official sources, normalize the page, hash the content,
+          compare it with the prior snapshot, and publish the impact feed consumed by this screen.
+        </p>
+        {sourceFeedError && <div className="source-error">Could not load source feed: {sourceFeedError}</div>}
+        <div className="source-grid">
+          {sourceFeed?.sources.map((source) => (
+            <article key={source.id} className={source.status === 'changed' ? 'source-changed' : ''}>
+              <div className="source-card-top">
+                <span>{source.publisher}</span>
+                <strong className={`source-status ${source.status}`}>{source.status}</strong>
+              </div>
+              <h3>{source.title}</h3>
+              <dl className="source-details">
+                <div><dt>Version</dt><dd>{source.sourceVersion ?? 'Not observed'}</dd></div>
+                <div><dt>Hash</dt><dd>{source.contentHash ? source.contentHash.slice(0, 12) : '—'}</dd></div>
+                <div><dt>Affects</dt><dd>{source.affectedNodeIds.length} nodes</dd></div>
+              </dl>
+              {source.status === 'changed' && (
+                <p className="source-impact-callout">Source changed → {source.affectedNodeIds.length} declared journey nodes require re-verification.</p>
+              )}
+              {source.error && <p className="source-error">Fetch recorded safely: {source.error}</p>}
+              <a href={source.url} target="_blank" rel="noreferrer">Open official source ↗</a>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="workspace">
         <div className="journey panel">
           <div className="section-heading compact">
             <div>
-              <p className="eyebrow">03 · JOURNEYGRAPH</p>
+              <p className="eyebrow">04 · JOURNEYGRAPH</p>
               <h2>Your dependency-aware journey</h2>
             </div>
             <span className="verified-count">{verification.verifiedNodes}/{verification.totalNodes} independently verified</span>
@@ -215,7 +280,7 @@ export default function App() {
       <section className="evidence panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">04 · EVIDENCE LEDGER</p>
+            <p className="eyebrow">05 · EVIDENCE LEDGER</p>
             <h2>Registration is not verification.</h2>
           </div>
         </div>
@@ -266,7 +331,7 @@ export default function App() {
           })}
         </div>
         <p className="evidence-note">
-          Current official sources are registered, but the prototype intentionally refuses to mark legal or policy claims verified until the retrieval service retains a matched, versioned passage. This is a safety feature, not a missing badge.
+          A successful source snapshot satisfies provenance freshness and versioning, but it still does not verify a policy claim. Passage matching and independent semantic support are separate gates.
         </p>
       </section>
 
