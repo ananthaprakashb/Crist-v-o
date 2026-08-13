@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { GoogleGenAI } from '@google/genai';
+import { fingerprintClaims } from './lib/evidenceFingerprint.mjs';
 
 const feedPath = process.env.SOURCE_FEED_PATH ?? path.resolve('public/source-intelligence.json');
 const stateDir = process.env.SOURCE_STATE_DIR ?? path.resolve('data/source-snapshots');
@@ -66,7 +67,7 @@ function validateVerdict(value) {
 
 async function verifyClaim(source, claim) {
   const claimText = claimStatement(source, claim);
-  const prompt = `You are an independent evidence verifier in a high-impact immigration information system.\n\nYour task is narrow: decide whether the EVIDENCE PASSAGE supports the CLAIM.\n\nRules:\n- Use only the supplied passage.\n- Do not use outside knowledge.\n- Do not infer legal eligibility, approval likelihood, or advice.\n- "supported" means the passage directly establishes the claim.\n- "contradicted" means the passage directly conflicts with the claim.\n- "uncertain" means the passage is ambiguous, incomplete, or does not establish the claim.\n- If the claim depends on table position or context that is not preserved in the passage, choose uncertain.\n\nCLAIM:\n${claimText}\n\nEVIDENCE PASSAGE:\n${claim.passage}`;
+  const prompt = `You are an independent evidence verifier in a high-impact immigration information system.\n\nYour task is narrow: decide whether the EVIDENCE PASSAGE supports the CLAIM.\n\nRules:\n- Use only the supplied passage.\n- Do not use outside knowledge.\n- Do not infer legal eligibility, approval likelihood, or advice.\n- "supported" means the passage directly establishes the claim.\n- "contradicted" means the passage directly conflicts with the claim.\n- "uncertain" means the passage is ambiguous, incomplete, or does not establish the claim.\n- For table evidence, use the supplied section title, column headers, row label, and row values exactly as presented.\n- If the claim still depends on table position or context that is not preserved in the passage, choose uncertain.\n\nCLAIM:\n${claimText}\n\nEVIDENCE PASSAGE:\n${claim.passage}`;
 
   const interaction = await ai.interactions.create({
     model,
@@ -100,12 +101,12 @@ function aggregate(verifications, expectedCount) {
 }
 
 async function persistSourceState(source) {
-  if (!source.contentHash) return;
+  if (!source.contentHash || !source.evidenceFingerprint) return;
   const statePath = path.join(stateDir, `${source.id}.json`);
   try {
     const state = JSON.parse(await readFile(statePath, 'utf8'));
-    if (state.contentHash !== source.contentHash) {
-      console.log(`${source.id}: semantic verdict not persisted because snapshot hash changed during verification.`);
+    if (state.contentHash !== source.contentHash || state.evidenceFingerprint !== source.evidenceFingerprint) {
+      console.log(`${source.id}: semantic verdict not persisted because source/evidence changed during verification.`);
       return;
     }
 
@@ -114,6 +115,7 @@ async function persistSourceState(source) {
     state.semanticVerifierModel = source.semanticVerifierModel;
     state.semanticVerifiedAt = source.semanticVerifiedAt;
     state.semanticVerifiedContentHash = source.contentHash;
+    state.semanticVerifiedEvidenceFingerprint = source.evidenceFingerprint;
     await writeFile(statePath, JSON.stringify(state, null, 2));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -129,6 +131,7 @@ for (const source of feed.sources ?? []) {
   const claims = source.matchedClaims ?? [];
   if (claims.length === 0) continue;
 
+  source.evidenceFingerprint = source.evidenceFingerprint ?? fingerprintClaims(claims);
   const semanticVerifications = [];
   for (const claim of claims) {
     attempted += 1;
@@ -158,6 +161,7 @@ for (const source of feed.sources ?? []) {
   source.semanticVerifierModel = model;
   source.semanticVerifiedAt = new Date().toISOString();
   source.semanticVerifiedContentHash = source.contentHash;
+  source.semanticVerifiedEvidenceFingerprint = source.evidenceFingerprint;
   await persistSourceState(source);
 }
 
