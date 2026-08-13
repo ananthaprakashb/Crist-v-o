@@ -39,11 +39,13 @@ export interface SourceFeedRecord {
   primaryFetchError?: string;
   extractionError?: string;
   matchedClaims?: MatchedSourceClaim[];
+  evidenceFingerprint?: string;
   semanticSupport?: SemanticSupport;
   semanticVerifications?: SemanticVerificationRecord[];
   semanticVerifierModel?: string;
   semanticVerifiedAt?: string;
   semanticVerifiedContentHash?: string;
+  semanticVerifiedEvidenceFingerprint?: string;
   affectedNodeIds: string[];
   changeSummary?: {
     added: string[];
@@ -97,13 +99,16 @@ export function applySourceIntelligence(
           .join('\n\n');
       }
 
-      const semanticMatchesCurrentSnapshot = Boolean(
+      const semanticMatchesCurrentEvidence = Boolean(
         source.semanticSupport &&
           source.semanticVerifiedContentHash &&
           source.contentHash &&
-          source.semanticVerifiedContentHash === source.contentHash,
+          source.semanticVerifiedContentHash === source.contentHash &&
+          source.semanticVerifiedEvidenceFingerprint &&
+          source.evidenceFingerprint &&
+          source.semanticVerifiedEvidenceFingerprint === source.evidenceFingerprint,
       );
-      evidence.semanticSupport = semanticMatchesCurrentSnapshot ? source.semanticSupport! : 'not-run';
+      evidence.semanticSupport = semanticMatchesCurrentEvidence ? source.semanticSupport! : 'not-run';
     }
 
     if (source.status !== 'changed') continue;
