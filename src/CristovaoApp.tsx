@@ -4,6 +4,7 @@ import { applyScenario, compileJourney, readiness } from './domain/journeyCompil
 import { applyStructuredProfile, reconcileDocument, type DocumentAnalysis, type FieldMismatch, type StructuredProfile } from './domain/reconciliation';
 import { applySourceIntelligence, type SourceIntelligenceFeed } from './domain/sourceIntelligence';
 import type { JourneyNode, ScenarioId } from './domain/types';
+import { publishTimelineTwin } from './timelineBridge';
 
 const DEFAULT_CASE = `I'm on H-1B. My spouse and child are dependents. My employer started an employment-based green card process, and my child will start college soon. My latest approval is valid through September 30, 2026. Help me understand what I should prepare and what information you still need.`;
 
@@ -75,6 +76,11 @@ export default function CristovaoApp() {
     return [...new Set([...rawScenario.changedNodeIds, ...sourceImpact.changedNodeIds, ...impacted])];
   }, [rawScenario.changedNodeIds, sourceImpact.changedNodeIds, sourceImpact.twin.nodes]);
   const scenario = { ...rawScenario, twin: verificationResult.twin, changedNodeIds };
+
+  useEffect(() => {
+    publishTimelineTwin(scenario.twin);
+  }, [scenario.twin]);
+
   const verification = verificationResult.report;
   const score = useMemo(() => readiness(scenario.twin), [scenario.twin]);
   const selectedNode = scenario.twin.nodes.find((item) => item.id === selectedNodeId) ?? scenario.twin.nodes[0];
