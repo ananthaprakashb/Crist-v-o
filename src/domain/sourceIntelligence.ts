@@ -12,10 +12,11 @@ export interface MatchedSourceClaim {
 
 export interface SemanticVerificationRecord {
   claimId: string;
-  claim: string;
+  claim?: string;
   verdict: SemanticSupport;
   confidence: 'high' | 'medium' | 'low';
   rationale: string;
+  method?: 'deterministic-table-validation' | 'gemini-semantic';
   model: string;
   verifiedAt: string;
   error?: string;
@@ -32,7 +33,7 @@ export interface SourceFeedRecord {
   contentHash?: string;
   previousHash?: string;
   observedUrl?: string;
-  retrievalMode?: 'html' | 'official-pdf-fallback' | 'manual-official-file';
+  retrievalMode?: 'html' | 'official-pdf-fallback' | 'manual-official-file' | string;
   contentType?: string;
   localFileName?: string;
   provenanceNote?: string;
@@ -56,7 +57,16 @@ export interface SourceFeedRecord {
 
 export interface SourceIntelligenceFeed {
   generatedAt: string | null;
+  persistence?: 'render-key-value' | 'ephemeral';
   sources: SourceFeedRecord[];
+  changedSourceIds?: string[];
+  changedNodeIds?: string[];
+  summary?: {
+    sourceCount: number;
+    verifiedSourceCount: number;
+    changedSourceCount: number;
+    unresolvedSourceIds: string[];
+  };
   semanticVerification?: {
     model: string;
     attemptedClaims: number;
