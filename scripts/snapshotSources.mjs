@@ -11,10 +11,10 @@ const registry = [
     affectedNodeIds: ['authoritative-evidence', 'employer-branch', 'dependent-milestone', 'next-milestone'],
   },
   {
-    id: 'visa-bulletin',
-    title: 'Visa Bulletin',
+    id: 'visa-bulletin-2026-08',
+    title: 'Visa Bulletin for August 2026',
     publisher: 'U.S. Department of State',
-    url: 'https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html',
+    url: 'https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2026/visa-bulletin-for-august-2026.html',
     affectedNodeIds: ['authoritative-evidence', 'priority-monitoring', 'next-milestone'],
   },
 ];
@@ -53,8 +53,8 @@ function hash(text) {
 }
 
 function versionFor(sourceId, text, contentHash) {
-  if (sourceId === 'visa-bulletin') {
-    const match = text.match(/Current Visa Bulletin\s+([A-Za-z]+)\s*(\d{4})/i);
+  if (sourceId.startsWith('visa-bulletin-')) {
+    const match = text.match(/Visa Bulletin(?: For| for)?\s+([A-Za-z]+)\s+(\d{4})/i);
     if (match) return `${match[1]} ${match[2]}`;
   }
   return `sha256:${contentHash.slice(0, 12)}`;
