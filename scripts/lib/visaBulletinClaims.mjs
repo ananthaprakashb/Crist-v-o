@@ -28,6 +28,14 @@ function eb2Row(sectionText) {
   };
 }
 
+function tableContext(sectionText, sectionLabel, rowPassage) {
+  const header = sectionText.match(
+    /Employment-based\s+All Chargeability Areas Except Those Listed\s+CHINA-mainland born\s+INDIA\s+MEXICO\s+PHILIPPINES/i,
+  )?.[0];
+
+  return [sectionLabel, header, rowPassage].filter(Boolean).join('\n');
+}
+
 export function extractVisaBulletinClaims(rawText) {
   const text = normalize(rawText);
   if (!text) return [];
@@ -50,7 +58,11 @@ export function extractVisaBulletinClaims(rawText) {
       claimId: 'eb2-india-final-action',
       label: 'EB-2 India final action status',
       value: finalAction.india,
-      passage: finalAction.passage,
+      passage: tableContext(
+        finalActionSection,
+        'FINAL ACTION DATES FOR EMPLOYMENT-BASED PREFERENCE CASES',
+        finalAction.passage,
+      ),
       matchType: 'deterministic-table-row',
     });
   }
@@ -61,7 +73,11 @@ export function extractVisaBulletinClaims(rawText) {
       claimId: 'eb2-india-filing-date',
       label: 'EB-2 India date for filing',
       value: filing.india,
-      passage: filing.passage,
+      passage: tableContext(
+        filingSection,
+        'DATES FOR FILING OF EMPLOYMENT-BASED VISA APPLICATIONS',
+        filing.passage,
+      ),
       matchType: 'deterministic-table-row',
     });
   }
