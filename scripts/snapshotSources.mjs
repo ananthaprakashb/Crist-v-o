@@ -15,6 +15,8 @@ const registry = [
     title: 'Visa Bulletin for August 2026',
     publisher: 'U.S. Department of State',
     url: 'https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2026/visa-bulletin-for-august-2026.html',
+    fallbackUrl: 'https://travel.state.gov/content/dam/visas/Bulletins/visabulletin_August2026.pdf',
+    versionHint: 'August 2026',
     affectedNodeIds: ['authoritative-evidence', 'priority-monitoring', 'next-milestone'],
   },
 ];
@@ -48,12 +50,13 @@ function normalizeHtml(html) {
     .trim();
 }
 
-function hash(text) {
-  return createHash('sha256').update(text).digest('hex');
+function hash(content) {
+  return createHash('sha256').update(content).digest('hex');
 }
 
-function versionFor(sourceId, text, contentHash) {
-  if (sourceId.startsWith('visa-bulletin-')) {
+function versionFor(source, text, contentHash) {
+  if (source.versionHint) return source.versionHint;
+  if (source.id.startsWith('visa-bulletin-')) {
     const match = text.match(/Visa Bulletin(?: For| for)?\s+([A-Za-z]+)\s+(\d{4})/i);
     if (match) return `${match[1]} ${match[2]}`;
   }
@@ -68,6 +71,7 @@ function sentences(text) {
 }
 
 function diffSummary(previousText = '', currentText = '') {
+  if (!previousText || !currentText) return { added: [], removed: [] };
   const before = new Set(sentences(previousText));
   const after = new Set(sentences(currentText));
   return {
@@ -84,33 +88,69 @@ async function readPrevious(id) {
   }
 }
 
-async function snapshot(source) {
-  const previous = await readPrevious(source.id);
+async function fetchResponse(url, accept) {
+  const response = await fetch(url, {
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20000),
+    headers: {
+      'user-agent': 'Cristovao-Caregiver-Hackathon/0.1 (+source provenance monitor)',
+      accept,
+    },
+  });
+
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+  return response;
+}
+
+async function fetchOfficialSource(source) {
   try {
-    const response = await fetch(source.url, {
-      redirect: 'follow',
-      signal: AbortSignal.timeout(20000),
-      headers: {
-        'user-agent': 'Cristovao-Caregiver-Hackathon/0.1 (+source provenance monitor)',
-        accept: 'text/html,application/xhtml+xml',
-      },
-    });
-
-    if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
-
+    const response = await fetchResponse(source.url, 'text/html,application/xhtml+xml');
     const text = normalizeHtml(await response.text());
     if (text.length < 200) throw new Error('Fetched page did not contain enough normalized text to snapshot safely.');
 
-    const contentHash = hash(text);
+    return {
+      observedUrl: response.url || source.url,
+      retrievalMode: 'html',
+      contentType: response.headers.get('content-type') ?? 'text/html',
+      normalizedText: text,
+      hashInput: text,
+    };
+  } catch (primaryError) {
+    if (!source.fallbackUrl) throw primaryError;
+
+    const response = await fetchResponse(source.fallbackUrl, 'application/pdf');
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length < 500) throw new Error('Official PDF fallback was unexpectedly small.');
+
+    return {
+      observedUrl: response.url || source.fallbackUrl,
+      retrievalMode: 'official-pdf-fallback',
+      contentType: response.headers.get('content-type') ?? 'application/pdf',
+      normalizedText: '',
+      hashInput: bytes,
+      primaryError: primaryError instanceof Error ? primaryError.message : String(primaryError),
+    };
+  }
+}
+
+async function snapshot(source) {
+  const previous = await readPrevious(source.id);
+  try {
+    const fetched = await fetchOfficialSource(source);
+    const contentHash = hash(fetched.hashInput);
     const retrievedAt = new Date().toISOString();
     const changed = Boolean(previous?.contentHash && previous.contentHash !== contentHash);
     const status = !previous?.contentHash ? 'first-snapshot' : changed ? 'changed' : 'unchanged';
+    const sourceVersion = versionFor(source, fetched.normalizedText, contentHash);
     const state = {
       id: source.id,
       retrievedAt,
-      sourceVersion: versionFor(source.id, text, contentHash),
+      sourceVersion,
       contentHash,
-      normalizedText: text.slice(0, 250000),
+      observedUrl: fetched.observedUrl,
+      retrievalMode: fetched.retrievalMode,
+      contentType: fetched.contentType,
+      normalizedText: fetched.normalizedText ? fetched.normalizedText.slice(0, 250000) : undefined,
     };
 
     await writeFile(path.join(stateDir, `${source.id}.json`), JSON.stringify(state, null, 2));
@@ -119,11 +159,15 @@ async function snapshot(source) {
       ...source,
       status,
       retrievedAt,
-      sourceVersion: state.sourceVersion,
+      sourceVersion,
       contentHash,
       previousHash: previous?.contentHash,
+      observedUrl: fetched.observedUrl,
+      retrievalMode: fetched.retrievalMode,
+      contentType: fetched.contentType,
+      primaryFetchError: fetched.primaryError,
       affectedNodeIds: source.affectedNodeIds,
-      changeSummary: changed ? diffSummary(previous?.normalizedText, text) : { added: [], removed: [] },
+      changeSummary: changed ? diffSummary(previous?.normalizedText, fetched.normalizedText) : { added: [], removed: [] },
     };
   } catch (error) {
     return {
@@ -145,6 +189,11 @@ const feed = { generatedAt: new Date().toISOString(), sources };
 await writeFile(feedPath, JSON.stringify(feed, null, 2));
 
 for (const source of sources) {
-  const suffix = source.status === 'error' ? `: ${source.error}` : ` ${source.sourceVersion ?? ''}`;
-  console.log(`${source.id}: ${source.status}${suffix}`);
+  if (source.status === 'error') {
+    console.log(`${source.id}: error: ${source.error}`);
+    continue;
+  }
+
+  const mode = source.retrievalMode === 'official-pdf-fallback' ? ' (official PDF fallback)' : '';
+  console.log(`${source.id}: ${source.status} ${source.sourceVersion ?? ''}${mode}`);
 }
