@@ -89,23 +89,30 @@ function buildUnknowns(facts: JourneyFact[]): UnknownFact[] {
   return unknowns;
 }
 
+function node(
+  value: Omit<JourneyNode, 'verificationStatus'> & { verificationStatus?: JourneyNode['verificationStatus'] },
+): JourneyNode {
+  return { verificationStatus: 'unverified', ...value };
+}
+
 function buildNodes(facts: JourneyFact[]): JourneyNode[] {
   const hasDependent = facts.some((fact) => fact.id === 'dependent');
   const hasEmploymentPath = facts.some((fact) => fact.id === 'employment-path');
 
   const nodes: JourneyNode[] = [
-    {
+    node({
       id: 'current-profile',
       title: 'Current immigration profile',
       summary: 'User-provided facts become the root of the digital twin. No unstated facts are assumed.',
       kind: 'current',
       evidenceStatus: 'supported',
+      verificationStatus: 'verified',
       impact: 'unchanged',
       dependsOn: [],
       affectedPeople: ['Primary'],
       evidenceIds: [],
-    },
-    {
+    }),
+    node({
       id: 'verify-critical-dates',
       title: 'Verify critical dates',
       summary: 'Collect exact validity and status dates before producing time-sensitive recommendations.',
@@ -115,8 +122,8 @@ function buildNodes(facts: JourneyFact[]): JourneyNode[] {
       dependsOn: ['current-profile'],
       affectedPeople: ['Primary'],
       evidenceIds: [],
-    },
-    {
+    }),
+    node({
       id: 'document-readiness',
       title: 'Build document readiness record',
       summary: 'Connect extracted document facts to the journey and flag disagreements instead of silently choosing a value.',
@@ -126,19 +133,19 @@ function buildNodes(facts: JourneyFact[]): JourneyNode[] {
       dependsOn: ['verify-critical-dates'],
       affectedPeople: ['Primary'],
       evidenceIds: [],
-    },
-    {
+    }),
+    node({
       id: 'authoritative-evidence',
       title: 'Match authoritative evidence',
-      summary: 'Every consequential rule must point to current authoritative evidence before it is treated as verified.',
+      summary: 'Every consequential rule must point to a current authoritative passage before it is treated as verified.',
       kind: 'action',
       evidenceStatus: 'needs-evidence',
       impact: 'unchanged',
       dependsOn: ['current-profile'],
       affectedPeople: ['Primary'],
-      evidenceIds: ['uscis-policy-manual', 'visa-bulletin'],
-    },
-    {
+      evidenceIds: ['uscis-policy-manual', 'visa-bulletin-2026-08'],
+    }),
+    node({
       id: 'employer-branch',
       title: 'Employment-change branch',
       summary: 'A what-if branch isolates which nodes would require review if the employment situation changes.',
@@ -148,8 +155,8 @@ function buildNodes(facts: JourneyFact[]): JourneyNode[] {
       dependsOn: ['verify-critical-dates', 'authoritative-evidence'],
       affectedPeople: ['Primary'],
       evidenceIds: [],
-    },
-    {
+    }),
+    node({
       id: 'next-milestone',
       title: 'Next verified milestone',
       summary: 'Cristóvão advances only after required facts and evidence reach the configured verification threshold.',
@@ -159,25 +166,25 @@ function buildNodes(facts: JourneyFact[]): JourneyNode[] {
       dependsOn: ['document-readiness', 'authoritative-evidence'],
       affectedPeople: ['Primary'],
       evidenceIds: [],
-    },
+    }),
   ];
 
   if (hasEmploymentPath) {
-    nodes.splice(4, 0, {
+    nodes.splice(4, 0, node({
       id: 'priority-monitoring',
       title: 'Priority-date / bulletin monitoring',
-      summary: 'Compare the verified priority date only against the applicable official bulletin and retain the source version used.',
+      summary: 'Compare a verified priority date only against the applicable official bulletin and retain the exact source version used.',
       kind: 'action',
       evidenceStatus: 'needs-evidence',
       impact: 'unchanged',
       dependsOn: ['authoritative-evidence'],
       affectedPeople: ['Primary'],
-      evidenceIds: ['visa-bulletin'],
-    });
+      evidenceIds: ['visa-bulletin-2026-08'],
+    }));
   }
 
   if (hasDependent) {
-    nodes.splice(nodes.length - 1, 0, {
+    nodes.splice(nodes.length - 1, 0, node({
       id: 'dependent-milestone',
       title: 'Dependent milestone review',
       summary: 'Keep dependent age and education milestones explicit; do not infer age-sensitive outcomes from approximate information.',
@@ -187,7 +194,7 @@ function buildNodes(facts: JourneyFact[]): JourneyNode[] {
       dependsOn: ['verify-critical-dates', 'authoritative-evidence'],
       affectedPeople: ['Dependent'],
       evidenceIds: [],
-    });
+    }));
   }
 
   return nodes;
@@ -214,15 +221,23 @@ export function compileJourney(input: string): DigitalTwin {
         title: 'USCIS Policy Manual',
         publisher: 'U.S. Citizenship and Immigration Services',
         url: 'https://www.uscis.gov/policy-manual',
-        status: 'pending-match',
+        authority: 'official-primary',
+        claimType: 'rule',
+        matchStatus: 'registered',
+        semanticSupport: 'not-run',
         supports: ['authoritative-evidence'],
       },
       {
-        id: 'visa-bulletin',
-        title: 'Visa Bulletin',
+        id: 'visa-bulletin-2026-08',
+        title: 'Visa Bulletin for August 2026',
         publisher: 'U.S. Department of State',
-        url: 'https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html',
-        status: 'pending-match',
+        url: 'https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2026/visa-bulletin-for-august-2026.html',
+        authority: 'official-primary',
+        claimType: 'rule',
+        matchStatus: 'registered',
+        semanticSupport: 'not-run',
+        retrievedAt: '2026-08-12',
+        sourceVersion: 'August 2026 · Publication 9514 · published July 15, 2026',
         supports: ['authoritative-evidence', 'priority-monitoring'],
       },
     ],
@@ -264,18 +279,27 @@ export function applyScenario(twin: DigitalTwin, scenario: ScenarioId): Scenario
 
   const meta = scenarioMeta[scenario];
   const nextTwin = structuredClone(twin);
-  const existingIds = new Set(nextTwin.nodes.map((node) => node.id));
+  const existingIds = new Set(nextTwin.nodes.map((item) => item.id));
   const changedNodeIds = meta.changed.filter((id) => existingIds.has(id));
 
-  nextTwin.nodes = nextTwin.nodes.map((node) =>
-    changedNodeIds.includes(node.id)
+  nextTwin.nodes = nextTwin.nodes.map((item) =>
+    changedNodeIds.includes(item.id)
       ? {
-          ...node,
+          ...item,
           impact: 'changed',
-          evidenceStatus: node.evidenceStatus === 'supported' ? 'supported' : 'needs-evidence',
+          verificationStatus: item.id === 'current-profile' ? 'verified' : 'needs-review',
+          evidenceStatus: item.evidenceStatus === 'supported' ? 'supported' : 'needs-evidence',
         }
-      : { ...node, impact: 'unchanged' },
+      : { ...item, impact: 'unchanged' },
   );
+
+  if (scenario === 'policy-update') {
+    nextTwin.evidence = nextTwin.evidence.map((record) =>
+      record.id === 'visa-bulletin-2026-08'
+        ? { ...record, semanticSupport: 'not-run', matchStatus: 'registered' }
+        : record,
+    );
+  }
 
   return {
     id: scenario,
@@ -289,8 +313,8 @@ export function applyScenario(twin: DigitalTwin, scenario: ScenarioId): Scenario
 
 export function readiness(twin: DigitalTwin) {
   const total = Math.max(twin.nodes.length, 1);
-  const supported = twin.nodes.filter((node) => node.evidenceStatus === 'supported').length;
-  const evidenceCoverage = Math.round((supported / total) * 100);
+  const verified = twin.nodes.filter((item) => item.verificationStatus === 'verified').length;
+  const evidenceCoverage = Math.round((verified / total) * 100);
   const knownFacts = twin.facts.length;
   const factCompleteness = Math.round((knownFacts / (knownFacts + twin.unknowns.length)) * 100);
 
