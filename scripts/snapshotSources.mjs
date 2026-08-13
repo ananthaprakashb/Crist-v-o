@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { extractPdfText } from './lib/pdfText.mjs';
+import { extractVisaBulletinClaims } from './lib/visaBulletinClaims.mjs';
 
 const registry = [
   {
@@ -63,6 +65,12 @@ function versionFor(source, text, contentHash) {
   return `sha256:${contentHash.slice(0, 12)}`;
 }
 
+function matchedClaimsFor(source, text) {
+  if (!text) return [];
+  if (source.id.startsWith('visa-bulletin-')) return extractVisaBulletinClaims(text);
+  return [];
+}
+
 function sentences(text) {
   return text
     .split(/(?<=[.!?])\s+|\n+/)
@@ -123,13 +131,22 @@ async function fetchOfficialSource(source) {
       const bytes = Buffer.from(await response.arrayBuffer());
       if (bytes.length < 500) throw new Error('Official PDF fallback was unexpectedly small.');
 
+      let normalizedText = '';
+      let extractionError;
+      try {
+        normalizedText = await extractPdfText(bytes);
+      } catch (error) {
+        extractionError = error instanceof Error ? error.message : String(error);
+      }
+
       return {
         observedUrl: response.url || source.fallbackUrl,
         retrievalMode: 'official-pdf-fallback',
         contentType: response.headers.get('content-type') ?? 'application/pdf',
-        normalizedText: '',
+        normalizedText,
         hashInput: bytes,
         primaryError: primaryError instanceof Error ? primaryError.message : String(primaryError),
+        extractionError,
       };
     } catch (fallbackError) {
       const primary = primaryError instanceof Error ? primaryError.message : String(primaryError);
@@ -148,6 +165,7 @@ async function snapshot(source) {
     const changed = Boolean(previous?.contentHash && previous.contentHash !== contentHash);
     const status = !previous?.contentHash ? 'first-snapshot' : changed ? 'changed' : 'unchanged';
     const sourceVersion = versionFor(source, fetched.normalizedText, contentHash);
+    const matchedClaims = matchedClaimsFor(source, fetched.normalizedText);
     const state = {
       id: source.id,
       retrievedAt,
@@ -157,6 +175,8 @@ async function snapshot(source) {
       retrievalMode: fetched.retrievalMode,
       contentType: fetched.contentType,
       normalizedText: fetched.normalizedText ? fetched.normalizedText.slice(0, 250000) : undefined,
+      matchedClaims,
+      extractionError: fetched.extractionError,
     };
 
     await writeFile(path.join(stateDir, `${source.id}.json`), JSON.stringify(state, null, 2));
@@ -172,6 +192,8 @@ async function snapshot(source) {
       retrievalMode: fetched.retrievalMode,
       contentType: fetched.contentType,
       primaryFetchError: fetched.primaryError,
+      extractionError: fetched.extractionError,
+      matchedClaims,
       affectedNodeIds: source.affectedNodeIds,
       changeSummary: changed ? diffSummary(previous?.normalizedText, fetched.normalizedText) : { added: [], removed: [] },
     };
@@ -189,6 +211,8 @@ async function snapshot(source) {
         contentType: previous.contentType,
         localFileName: previous.localFileName,
         provenanceNote: previous.provenanceNote,
+        matchedClaims: previous.matchedClaims ?? [],
+        extractionError: previous.extractionError,
         affectedNodeIds: source.affectedNodeIds,
         error: `Refresh attempt blocked; retaining last known snapshot. ${message}`,
       };
@@ -219,5 +243,7 @@ for (const source of sources) {
   }
 
   const mode = source.retrievalMode === 'official-pdf-fallback' ? ' (official PDF fallback)' : '';
-  console.log(`${source.id}: ${source.status} ${source.sourceVersion ?? ''}${mode}`);
+  const matches = source.matchedClaims?.length ? ` · ${source.matchedClaims.length} evidence passages matched` : '';
+  const extraction = source.extractionError ? ` · extraction warning: ${source.extractionError}` : '';
+  console.log(`${source.id}: ${source.status} ${source.sourceVersion ?? ''}${mode}${matches}${extraction}`);
 }
