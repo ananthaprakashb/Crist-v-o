@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { extractPdfText } from './lib/pdfText.mjs';
 import { extractVisaBulletinClaims } from './lib/visaBulletinClaims.mjs';
+import { fingerprintClaims } from './lib/evidenceFingerprint.mjs';
 
 const registry = {
   'visa-bulletin-2026-08': {
@@ -82,6 +83,26 @@ try {
   extractionError = error instanceof Error ? error.message : String(error);
 }
 const matchedClaims = normalizedText ? extractVisaBulletinClaims(normalizedText) : [];
+const evidenceFingerprint = fingerprintClaims(matchedClaims);
+const preserveSemantic = Boolean(
+  !changed &&
+    evidenceFingerprint &&
+    previous?.semanticVerifiedContentHash === contentHash &&
+    previous?.semanticVerifiedEvidenceFingerprint === evidenceFingerprint,
+);
+
+const semanticState = preserveSemantic
+  ? {
+      semanticSupport: previous.semanticSupport,
+      semanticVerifications: previous.semanticVerifications,
+      semanticVerifierModel: previous.semanticVerifierModel,
+      semanticVerifiedAt: previous.semanticVerifiedAt,
+      semanticVerifiedContentHash: previous.semanticVerifiedContentHash,
+      semanticVerifiedEvidenceFingerprint: previous.semanticVerifiedEvidenceFingerprint,
+    }
+  : {
+      semanticSupport: 'not-run',
+    };
 
 const state = {
   id: source.id,
@@ -95,7 +116,9 @@ const state = {
   provenanceNote: 'File was manually downloaded from the official Department of State source because automated retrieval was blocked.',
   normalizedText: normalizedText ? normalizedText.slice(0, 250000) : undefined,
   matchedClaims,
+  evidenceFingerprint,
   extractionError,
+  ...semanticState,
 };
 await writeFile(path.join(stateDir, `${source.id}.json`), JSON.stringify(state, null, 2));
 
@@ -113,7 +136,9 @@ const record = {
   localFileName: path.basename(filePath),
   provenanceNote: state.provenanceNote,
   matchedClaims,
+  evidenceFingerprint,
   extractionError,
+  ...semanticState,
   affectedNodeIds: source.affectedNodeIds,
   changeSummary: { added: [], removed: [] },
 };
