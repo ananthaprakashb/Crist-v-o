@@ -101,6 +101,24 @@ GEMINI_MODEL=gemini-3.6-flash
 
 Trigger `refreshImmigrationEvidence` manually from the Render Dashboard/CLI first. Scheduling should be added with a Render Cron Job that triggers the task because Workflows do not currently provide native schedules.
 
-## Web integration boundary
+## Web integration
 
-The workflow does not attempt to modify Vite static files from a task instance. The durable output is `cristovao:feed:latest` in Key Value. A small web/API service should read this key and expose it to the React application; the existing `public/source-intelligence.json` remains the local-development fallback until that API slice is added.
+The durable workflow output is now consumed by `server/src/index.ts`.
+
+Production flow:
+
+```text
+Render Workflow
+      ↓
+cristovao:feed:latest (Render Key Value)
+      ↓
+Cristóvão Web Service
+      ↓
+/source-intelligence.json
+      ↓
+React Evidence Ledger + JourneyGraph
+```
+
+The browser never receives `REDIS_URL`. The server reads the sanitized workflow output and exposes it through `/api/evidence/latest`. For compatibility with the existing React feed contract, `/source-intelligence.json` serves the same live feed when Key Value is available and falls back to the bundled static snapshot when it is not.
+
+See `server/README.md` for Web Service deployment settings.
