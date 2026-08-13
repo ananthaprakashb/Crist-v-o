@@ -12,6 +12,7 @@
     "sources:import": "node scripts/importSourceFile.mjs"
   },
   "dependencies": {
+    "pdfjs-dist": "latest",
     "react": "latest",
     "react-dom": "latest"
   },
