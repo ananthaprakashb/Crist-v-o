@@ -1,0 +1,21 @@
+{
+  "generatedAt": null,
+  "sources": [
+    {
+      "id": "uscis-policy-manual",
+      "title": "USCIS Policy Manual",
+      "publisher": "U.S. Citizenship and Immigration Services",
+      "url": "https://www.uscis.gov/policy-manual",
+      "status": "not-run",
+      "affectedNodeIds": ["authoritative-evidence", "employer-branch", "dependent-milestone", "next-milestone"]
+    },
+    {
+      "id": "visa-bulletin",
+      "title": "Visa Bulletin",
+      "publisher": "U.S. Department of State",
+      "url": "https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html",
+      "status": "not-run",
+      "affectedNodeIds": ["authoritative-evidence", "priority-monitoring", "next-milestone"]
+    }
+  ]
+}
