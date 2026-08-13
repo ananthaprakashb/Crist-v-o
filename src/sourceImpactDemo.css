@@ -22,4 +22,6 @@
 .source-demo-nodes b, .source-demo-claims b { font-size: .74rem; }
 .source-demo-reset { width: 100%; }
 .source-demo-hint { line-height: 1.45; }
+body:has(.source-demo-mode.synthetic) .stats-grid .stat-card:nth-child(3) small { font-size: 0; }
+body:has(.source-demo-mode.synthetic) .stats-grid .stat-card:nth-child(3) small::after { content: 'Synthetic source change active'; font-size: .75rem; }
 @media (max-width: 620px) { .source-demo-drawer { right: 10px; top: 10px; width: calc(100vw - 20px); max-height: calc(100vh - 20px); } .source-demo-flow, .source-demo-trust { grid-template-columns: 1fr; } .source-demo-flow > b { transform: rotate(90deg); justify-self: center; } }
