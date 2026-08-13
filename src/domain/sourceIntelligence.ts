@@ -1,4 +1,6 @@
 import type { DigitalTwin, SemanticSupport } from './types';
+import { createSyntheticSourceChange } from './policyImpact';
+import { isSourceImpactDemoActive } from '../sourceDemoState';
 
 export type SourceRunStatus = 'not-run' | 'first-snapshot' | 'unchanged' | 'changed' | 'refresh-blocked' | 'error';
 
@@ -89,11 +91,12 @@ export function applySourceIntelligence(
     return { twin: structuredClone(twin), changedNodeIds: [], changedSourceIds: [] };
   }
 
+  const effectiveFeed = isSourceImpactDemoActive() ? createSyntheticSourceChange(feed) : feed;
   const nextTwin = structuredClone(twin);
   const changedNodeIds = new Set<string>();
   const changedSourceIds: string[] = [];
 
-  for (const source of feed.sources) {
+  for (const source of effectiveFeed.sources) {
     const evidence = nextTwin.evidence.find((record) => record.id === source.id);
 
     if (evidence && source.status !== 'error' && source.status !== 'not-run') {
