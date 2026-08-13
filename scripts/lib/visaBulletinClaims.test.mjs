@@ -22,9 +22,20 @@ G. U.S. GOVERNMENT EMPLOYEE SPECIAL IMMIGRANT VISAS (SIVs)
 describe('Visa Bulletin claim extraction', () => {
   it('extracts EB-2 India final action, filing, and availability warning evidence', () => {
     const claims = extractVisaBulletinClaims(fixture);
+    const finalAction = claims.find((claim) => claim.claimId === 'eb2-india-final-action');
+    const filing = claims.find((claim) => claim.claimId === 'eb2-india-filing-date');
+    const warning = claims.find((claim) => claim.claimId === 'eb2-availability-warning');
 
-    expect(claims.find((claim) => claim.claimId === 'eb2-india-final-action')?.value).toBe('U');
-    expect(claims.find((claim) => claim.claimId === 'eb2-india-filing-date')?.value).toBe('15JAN15');
-    expect(claims.find((claim) => claim.claimId === 'eb2-availability-warning')?.passage).toContain('retrogress');
+    expect(finalAction?.value).toBe('U');
+    expect(filing?.value).toBe('15JAN15');
+    expect(warning?.passage).toContain('retrogress');
+
+    expect(finalAction?.passage).toContain('FINAL ACTION DATES FOR EMPLOYMENT-BASED PREFERENCE CASES');
+    expect(finalAction?.passage).toContain('CHINA-mainland born INDIA MEXICO PHILIPPINES');
+    expect(finalAction?.passage).toContain('2nd C 01SEP21 U C C');
+
+    expect(filing?.passage).toContain('DATES FOR FILING OF EMPLOYMENT-BASED VISA APPLICATIONS');
+    expect(filing?.passage).toContain('CHINA-mainland born INDIA MEXICO PHILIPPINES');
+    expect(filing?.passage).toContain('2nd C 01JAN22 15JAN15 C C');
   });
 });
