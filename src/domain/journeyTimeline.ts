@@ -1,8 +1,11 @@
+import type { DigitalTwin } from './types';
+
 export type TimelineUrgency = 'overdue' | 'urgent' | 'soon' | 'later' | 'unknown';
 export type TimelineDateKind = 'exact' | 'today' | 'unknown';
 
 export interface TimelineInput {
   petitionValidTo?: string;
+  documentValidTo?: string;
   i94Expiration?: string;
   priorityDate?: string;
   missingCriticalFacts?: string[];
@@ -17,7 +20,7 @@ export interface TimelineItem {
   urgency: TimelineUrgency;
   daysAway?: number;
   explanation: string;
-  source: 'profile' | 'document-review' | 'missing-fact';
+  source: 'profile' | 'document' | 'document-review' | 'missing-fact';
   relatedNodeIds: string[];
 }
 
@@ -53,6 +56,7 @@ function exactItem(
   anchor: Date,
   explanation: string,
   relatedNodeIds: string[],
+  source: TimelineItem['source'] = 'profile',
 ): TimelineItem {
   return {
     id,
@@ -62,8 +66,26 @@ function exactItem(
     urgency: urgencyForDate(anchor, date),
     daysAway: daysBetween(anchor, date),
     explanation,
-    source: 'profile',
+    source,
     relatedNodeIds,
+  };
+}
+
+function isDateRelatedUnknown(label: string) {
+  return /date|expiration|validity|i-?94|priority|birth|age|milestone/i.test(label);
+}
+
+export function timelineInputFromTwin(twin: DigitalTwin): TimelineInput {
+  const fact = (id: string) => twin.facts.find((item) => item.id === id)?.value;
+  return {
+    petitionValidTo: fact('petition-validity'),
+    documentValidTo: fact('document-valid-to'),
+    i94Expiration: fact('i94-expiration'),
+    priorityDate: fact('priority-date'),
+    documentDiscrepancy: twin.unknowns.some((item) => item.id === 'document-discrepancy'),
+    missingCriticalFacts: twin.unknowns
+      .filter((item) => item.id !== 'document-discrepancy' && isDateRelatedUnknown(item.label))
+      .map((item) => item.label),
   };
 }
 
@@ -73,11 +95,11 @@ export function buildJourneyTimeline(input: TimelineInput, anchor = new Date()):
   if (input.documentDiscrepancy) {
     items.push({
       id: 'document-discrepancy-review',
-      title: 'Resolve document/profile discrepancy',
+      title: 'Document/profile date mismatch',
       dateKind: 'today',
       urgency: 'urgent',
       daysAway: 0,
-      explanation: 'Two retained values disagree. Cristóvão keeps both and places reconciliation ahead of dependent planning.',
+      explanation: 'Two observed values disagree. Both dates remain visible until the mismatch is resolved.',
       source: 'document-review',
       relatedNodeIds: ['verify-critical-dates', 'document-readiness', 'next-milestone'],
     });
@@ -86,11 +108,23 @@ export function buildJourneyTimeline(input: TimelineInput, anchor = new Date()):
   if (input.petitionValidTo && parseIsoDate(input.petitionValidTo)) {
     items.push(exactItem(
       'petition-validity',
-      'Approval validity date',
+      'Profile validity date',
       input.petitionValidTo,
       anchor,
-      'A user- or document-stated validity date. This is an observed date, not a generated filing deadline.',
+      'An explicitly stated profile date. It is shown exactly as recorded.',
       ['verify-critical-dates', 'document-readiness', 'next-milestone'],
+    ));
+  }
+
+  if (input.documentValidTo && parseIsoDate(input.documentValidTo)) {
+    items.push(exactItem(
+      'document-valid-to',
+      'Document validity date',
+      input.documentValidTo,
+      anchor,
+      'An extracted document date. It remains separate from the profile value when the two disagree.',
+      ['verify-critical-dates', 'document-readiness', 'next-milestone'],
+      'document',
     ));
   }
 
