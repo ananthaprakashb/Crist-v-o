@@ -35,7 +35,7 @@ jobs:
       - name: Production build
         run: npm run build
 
-      - name: Evidence API smoke test
+      - name: Web API smoke test
         run: |
           npm run server:start > /tmp/cristovao-server.log 2>&1 &
           SERVER_PID=$!
@@ -49,3 +49,13 @@ jobs:
           cat /tmp/health.json
           curl --fail --silent http://127.0.0.1:3001/source-intelligence.json > /tmp/feed.json
           node -e "const f=require('/tmp/feed.json'); if(!Array.isArray(f.sources)) process.exit(1); console.log('fallback sources:', f.sources.length)"
+
+          curl --fail --silent -X POST http://127.0.0.1:3001/api/intake/structure \
+            -H 'content-type: application/json' \
+            --data '{"input":"I am on H-1B. My latest approval is valid through September 30, 2026."}' > /tmp/intake.json
+          node -e "const f=require('/tmp/intake.json'); if(f.petitionValidTo!=='2026-09-30') { console.error(f); process.exit(1) } console.log('intake method:', f.method)"
+
+          curl --fail --silent -X POST http://127.0.0.1:3001/api/document/extract \
+            -H 'content-type: application/json' \
+            --data '{"synthetic":true,"syntheticText":"Receipt Number: IOE0912345678\nClassification: H-1B\nValid To: September 30, 2027"}' > /tmp/document.json
+          node -e "const f=require('/tmp/document.json'); if(f.fields?.validTo?.value!=='2027-09-30') { console.error(f); process.exit(1) } console.log('document method:', f.method)"
