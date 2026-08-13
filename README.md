@@ -16,7 +16,7 @@ Most immigration AI answers questions. Cristóvão builds a **verified digital t
 
 The core demo loop is:
 
-> **change one fact → recompute the journey → explain affected nodes → prove it with evidence**
+> **change one fact or source → recompute the journey → explain affected nodes → prove it with evidence**
 
 ## Implemented foundation
 
@@ -44,17 +44,44 @@ The independent verifier checks for:
 
 Only when every required check passes can an attached evidence record become `verified`. A contradictory record becomes `rejected`; incomplete evidence stays `needs-review`.
 
-The current source registry includes official USCIS and U.S. Department of State sources. The UI intentionally displays incomplete verifier checks rather than manufacturing a green verification badge.
+### Source Intelligence
+
+Cristóvão now has an executable official-source watcher rather than a simulated-only policy update.
+
+Run:
+
+```bash
+npm run sources:snapshot
+```
+
+The watcher:
+
+1. fetches registered official sources,
+2. extracts and normalizes main page text,
+3. computes a SHA-256 content hash,
+4. retains the previous local snapshot,
+5. detects first-seen / unchanged / changed states,
+6. stores a small human-readable change summary,
+7. writes `public/source-intelligence.json`, and
+8. propagates a changed source only to JourneyGraph nodes declared as dependent on that source.
+
+A successful snapshot supplies freshness, source version, and content hash to the Evidence Engine. It **does not** automatically mark a policy claim verified; matched passages and independent semantic support remain separate gates.
+
+Fetch errors are captured as source status instead of silently falling back to stale or invented content.
+
+Local snapshot state is stored under `data/source-snapshots/` and ignored by Git. The state directory can be overridden with `SOURCE_STATE_DIR`, which is intended for a persistent volume or object-backed implementation when this worker moves to Render Workflows.
 
 ### Automated validation
 
-Vitest covers both the Journey Compiler and Evidence Engine. Tests specifically verify that:
+Vitest covers the Journey Compiler, Evidence Engine, and Source Intelligence layer. Tests verify that:
 
 - critical dates are not invented,
 - what-if impact is limited to connected nodes,
 - official-source registration alone does **not** verify a journey node,
-- all evidence checks are required before verification, and
-- contradictory evidence rejects a consequential node.
+- all evidence checks are required before verification,
+- contradictory evidence rejects a consequential node,
+- a first source snapshot adds provenance without creating a fake policy change, and
+- a real source change propagates only to declared dependent nodes.
 
 GitHub Actions runs unit tests and a production build for pull requests.
 
@@ -62,6 +89,7 @@ GitHub Actions runs unit tests and a production build for pull requests.
 
 ```bash
 npm install
+npm run sources:snapshot
 npm run dev
 ```
 
@@ -78,9 +106,9 @@ Cristóvão is an informational navigation and preparation tool, **not legal adv
 
 ## Next implementation slices
 
-1. Server-side authoritative-source retrieval and versioned snapshots.
-2. Evidence passage matching and semantic verification.
-3. Policy-change diffing and graph impact propagation.
+1. Passage extraction and claim-to-passage matching.
+2. AI semantic verification with structured output and deterministic acceptance rules.
+3. Render Workflow orchestration and persistent source state.
 4. AI structured intake with schema validation.
 5. Synthetic document extraction and cross-document discrepancy detection.
 
