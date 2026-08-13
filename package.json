@@ -18,8 +18,8 @@
     "server:start": "tsx server/src/app.ts",
     "server:dev": "tsx watch server/src/app.ts",
     "server:check": "tsc -p server/tsconfig.json",
-    "workflows:start": "tsx workflows/src/index.ts",
-    "workflows:dev": "render workflows dev -- npx tsx workflows/src/index.ts",
+    "workflows:start": "tsx workflows/src/bootstrap.ts",
+    "workflows:dev": "render workflows dev -- npx tsx workflows/src/bootstrap.ts",
     "workflows:check": "tsc -p workflows/tsconfig.json"
   },
   "dependencies": {
