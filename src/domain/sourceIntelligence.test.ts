@@ -9,10 +9,10 @@ function feed(status: 'first-snapshot' | 'changed'): SourceIntelligenceFeed {
     generatedAt: '2026-08-13T06:30:00.000Z',
     sources: [
       {
-        id: 'visa-bulletin',
-        title: 'Visa Bulletin',
+        id: 'visa-bulletin-2026-08',
+        title: 'Visa Bulletin for August 2026',
         publisher: 'U.S. Department of State',
-        url: 'https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html',
+        url: 'https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2026/visa-bulletin-for-august-2026.html',
         status,
         retrievedAt: '2026-08-13T06:30:00.000Z',
         sourceVersion: 'August 2026',
@@ -28,7 +28,7 @@ describe('Source Intelligence', () => {
   it('adds snapshot provenance without pretending a first snapshot is a policy change', () => {
     const twin = compileJourney(syntheticCase);
     const result = applySourceIntelligence(twin, feed('first-snapshot'));
-    const evidence = result.twin.evidence.find((item) => item.id === 'visa-bulletin');
+    const evidence = result.twin.evidence.find((item) => item.id === 'visa-bulletin-2026-08');
 
     expect(evidence?.sourceVersion).toBe('August 2026');
     expect(evidence?.contentHash).toBe('abc123');
@@ -39,7 +39,7 @@ describe('Source Intelligence', () => {
     const twin = compileJourney(syntheticCase);
     const result = applySourceIntelligence(twin, feed('changed'));
 
-    expect(result.changedSourceIds).toEqual(['visa-bulletin']);
+    expect(result.changedSourceIds).toEqual(['visa-bulletin-2026-08']);
     expect(result.changedNodeIds).toEqual(['authoritative-evidence', 'priority-monitoring', 'next-milestone']);
     expect(result.twin.nodes.find((node) => node.id === 'priority-monitoring')?.impact).toBe('changed');
     expect(result.twin.nodes.find((node) => node.id === 'document-readiness')?.impact).toBe('unchanged');
