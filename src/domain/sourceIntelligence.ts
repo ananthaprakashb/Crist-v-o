@@ -1,4 +1,4 @@
-import type { DigitalTwin } from './types';
+import type { DigitalTwin, SemanticSupport } from './types';
 
 export type SourceRunStatus = 'not-run' | 'first-snapshot' | 'unchanged' | 'changed' | 'refresh-blocked' | 'error';
 
@@ -8,6 +8,17 @@ export interface MatchedSourceClaim {
   value?: string;
   passage: string;
   matchType: 'deterministic-table-row' | 'deterministic-section-anchor';
+}
+
+export interface SemanticVerificationRecord {
+  claimId: string;
+  claim: string;
+  verdict: SemanticSupport;
+  confidence: 'high' | 'medium' | 'low';
+  rationale: string;
+  model: string;
+  verifiedAt: string;
+  error?: string;
 }
 
 export interface SourceFeedRecord {
@@ -28,6 +39,10 @@ export interface SourceFeedRecord {
   primaryFetchError?: string;
   extractionError?: string;
   matchedClaims?: MatchedSourceClaim[];
+  semanticSupport?: SemanticSupport;
+  semanticVerifications?: SemanticVerificationRecord[];
+  semanticVerifierModel?: string;
+  semanticVerifiedAt?: string;
   affectedNodeIds: string[];
   changeSummary?: {
     added: string[];
@@ -39,6 +54,12 @@ export interface SourceFeedRecord {
 export interface SourceIntelligenceFeed {
   generatedAt: string | null;
   sources: SourceFeedRecord[];
+  semanticVerification?: {
+    model: string;
+    attemptedClaims: number;
+    completedClaims: number;
+    generatedAt: string;
+  };
 }
 
 export interface SourceImpactResult {
@@ -73,6 +94,10 @@ export function applySourceIntelligence(
         evidence.passage = matchedClaims
           .map((claim) => `${claim.label}${claim.value ? ` (${claim.value})` : ''}: ${claim.passage}`)
           .join('\n\n');
+      }
+
+      if (source.semanticSupport) {
+        evidence.semanticSupport = source.semanticSupport;
       }
     }
 
