@@ -3,6 +3,11 @@ export type NodeKind = 'current' | 'requirement' | 'document' | 'action' | 'risk
 export type NodeEvidenceStatus = 'supported' | 'needs-evidence' | 'unknown';
 export type ImpactState = 'unchanged' | 'changed' | 'new';
 export type ScenarioId = 'baseline' | 'employer-change' | 'dependent-milestone' | 'policy-update';
+export type EvidenceMatchStatus = 'registered' | 'matched' | 'superseded';
+export type EvidenceAuthority = 'official-primary' | 'official-secondary' | 'community';
+export type ClaimType = 'fact' | 'rule' | 'inference' | 'unknown';
+export type SemanticSupport = 'supported' | 'contradicted' | 'uncertain' | 'not-run';
+export type VerificationStatus = 'verified' | 'needs-review' | 'rejected' | 'unverified';
 
 export interface JourneyFact {
   id: string;
@@ -24,6 +29,7 @@ export interface JourneyNode {
   summary: string;
   kind: NodeKind;
   evidenceStatus: NodeEvidenceStatus;
+  verificationStatus: VerificationStatus;
   impact: ImpactState;
   dependsOn: string[];
   affectedPeople: string[];
@@ -35,8 +41,14 @@ export interface EvidenceRecord {
   title: string;
   publisher: string;
   url: string;
-  status: 'matched' | 'pending-match';
+  authority: EvidenceAuthority;
+  claimType: ClaimType;
+  matchStatus: EvidenceMatchStatus;
+  semanticSupport: SemanticSupport;
   retrievedAt?: string;
+  sourceVersion?: string;
+  contentHash?: string;
+  passage?: string;
   supports: string[];
 }
 
@@ -58,4 +70,32 @@ export interface ScenarioResult {
   twin: DigitalTwin;
   changedNodeIds: string[];
   questionsRaised: string[];
+}
+
+export interface VerificationCheck {
+  id: string;
+  label: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface EvidenceVerification {
+  evidenceId: string;
+  status: VerificationStatus;
+  checks: VerificationCheck[];
+}
+
+export interface NodeVerification {
+  nodeId: string;
+  status: VerificationStatus;
+  evidenceIds: string[];
+  reasons: string[];
+}
+
+export interface VerificationReport {
+  totalNodes: number;
+  verifiedNodes: number;
+  unresolvedNodeIds: string[];
+  evidence: EvidenceVerification[];
+  nodes: NodeVerification[];
 }
