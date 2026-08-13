@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { extractPdfText } from './lib/pdfText.mjs';
 import { extractVisaBulletinClaims } from './lib/visaBulletinClaims.mjs';
+import { fingerprintClaims } from './lib/evidenceFingerprint.mjs';
 
 const registry = [
   {
@@ -96,8 +97,14 @@ async function readPrevious(id) {
   }
 }
 
-function semanticStateFor(previous, contentHash, changed) {
-  const valid = !changed && previous?.semanticVerifiedContentHash === contentHash;
+function semanticStateFor(previous, contentHash, evidenceFingerprint, changed) {
+  const valid = Boolean(
+    !changed &&
+      evidenceFingerprint &&
+      previous?.semanticVerifiedContentHash === contentHash &&
+      previous?.semanticVerifiedEvidenceFingerprint === evidenceFingerprint,
+  );
+
   return valid
     ? {
         semanticSupport: previous.semanticSupport ?? 'not-run',
@@ -105,6 +112,7 @@ function semanticStateFor(previous, contentHash, changed) {
         semanticVerifierModel: previous.semanticVerifierModel,
         semanticVerifiedAt: previous.semanticVerifiedAt,
         semanticVerifiedContentHash: previous.semanticVerifiedContentHash,
+        semanticVerifiedEvidenceFingerprint: previous.semanticVerifiedEvidenceFingerprint,
       }
     : {
         semanticSupport: 'not-run',
@@ -112,6 +120,7 @@ function semanticStateFor(previous, contentHash, changed) {
         semanticVerifierModel: undefined,
         semanticVerifiedAt: undefined,
         semanticVerifiedContentHash: undefined,
+        semanticVerifiedEvidenceFingerprint: undefined,
       };
 }
 
@@ -185,7 +194,8 @@ async function snapshot(source) {
     const status = !previous?.contentHash ? 'first-snapshot' : changed ? 'changed' : 'unchanged';
     const sourceVersion = versionFor(source, fetched.normalizedText, contentHash);
     const matchedClaims = matchedClaimsFor(source, fetched.normalizedText);
-    const semanticState = semanticStateFor(previous, contentHash, changed);
+    const evidenceFingerprint = fingerprintClaims(matchedClaims);
+    const semanticState = semanticStateFor(previous, contentHash, evidenceFingerprint, changed);
     const state = {
       id: source.id,
       retrievedAt,
@@ -196,6 +206,7 @@ async function snapshot(source) {
       contentType: fetched.contentType,
       normalizedText: fetched.normalizedText ? fetched.normalizedText.slice(0, 250000) : undefined,
       matchedClaims,
+      evidenceFingerprint,
       extractionError: fetched.extractionError,
       ...semanticState,
     };
@@ -215,6 +226,7 @@ async function snapshot(source) {
       primaryFetchError: fetched.primaryError,
       extractionError: fetched.extractionError,
       matchedClaims,
+      evidenceFingerprint,
       ...semanticState,
       affectedNodeIds: source.affectedNodeIds,
       changeSummary: changed ? diffSummary(previous?.normalizedText, fetched.normalizedText) : { added: [], removed: [] },
@@ -222,7 +234,8 @@ async function snapshot(source) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (previous?.contentHash) {
-      const semanticState = semanticStateFor(previous, previous.contentHash, false);
+      const evidenceFingerprint = previous.evidenceFingerprint ?? fingerprintClaims(previous.matchedClaims ?? []);
+      const semanticState = semanticStateFor(previous, previous.contentHash, evidenceFingerprint, false);
       return {
         ...source,
         status: 'refresh-blocked',
@@ -235,6 +248,7 @@ async function snapshot(source) {
         localFileName: previous.localFileName,
         provenanceNote: previous.provenanceNote,
         matchedClaims: previous.matchedClaims ?? [],
+        evidenceFingerprint,
         extractionError: previous.extractionError,
         ...semanticState,
         affectedNodeIds: source.affectedNodeIds,
