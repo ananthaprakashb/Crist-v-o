@@ -54,7 +54,7 @@ export default function SourceImpactDemoControl() {
           </span>
           <strong>Change one source. Watch the graph react.</strong>
         </div>
-        {!active && !liveChange && <button className="source-demo-close" onClick={() => setOpen(false)}>×</button>}
+        <button className="source-demo-close" onClick={() => setOpen(false)} aria-label="Close source change panel">×</button>
       </div>
 
       {!active && !liveChange ? (
