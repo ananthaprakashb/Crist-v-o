@@ -16,7 +16,8 @@
     "sources:verify": "node scripts/verifySourceClaims.mjs",
     "sources:status": "node scripts/sourceStatus.mjs",
     "workflows:start": "tsx workflows/src/index.ts",
-    "workflows:dev": "render workflows dev -- npx tsx workflows/src/index.ts"
+    "workflows:dev": "render workflows dev -- npx tsx workflows/src/index.ts",
+    "workflows:check": "tsc -p workflows/tsconfig.json"
   },
   "dependencies": {
     "@google/genai": "latest",
@@ -27,6 +28,7 @@
     "react-dom": "latest"
   },
   "devDependencies": {
+    "@types/node": "^24.0.0",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "latest",
