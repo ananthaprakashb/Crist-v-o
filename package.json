@@ -9,9 +9,11 @@
     "preview": "vite preview",
     "test": "vitest run",
     "sources:snapshot": "node scripts/snapshotSources.mjs",
-    "sources:import": "node scripts/importSourceFile.mjs"
+    "sources:import": "node scripts/importSourceFile.mjs",
+    "sources:verify": "node scripts/verifySourceClaims.mjs"
   },
   "dependencies": {
+    "@google/genai": "latest",
     "pdfjs-dist": "latest",
     "react": "latest",
     "react-dom": "latest"
