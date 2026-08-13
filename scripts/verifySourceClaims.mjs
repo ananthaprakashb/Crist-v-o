@@ -3,6 +3,7 @@ import path from 'node:path';
 import { GoogleGenAI } from '@google/genai';
 
 const feedPath = process.env.SOURCE_FEED_PATH ?? path.resolve('public/source-intelligence.json');
+const stateDir = process.env.SOURCE_STATE_DIR ?? path.resolve('data/source-snapshots');
 const model = process.env.GEMINI_MODEL ?? 'gemini-3.6-flash';
 const apiKey = process.env.GEMINI_API_KEY;
 
@@ -98,6 +99,28 @@ function aggregate(verifications, expectedCount) {
   return completed.length > 0 && completed.every((item) => item.verdict === 'supported') ? 'supported' : 'not-run';
 }
 
+async function persistSourceState(source) {
+  if (!source.contentHash) return;
+  const statePath = path.join(stateDir, `${source.id}.json`);
+  try {
+    const state = JSON.parse(await readFile(statePath, 'utf8'));
+    if (state.contentHash !== source.contentHash) {
+      console.log(`${source.id}: semantic verdict not persisted because snapshot hash changed during verification.`);
+      return;
+    }
+
+    state.semanticVerifications = source.semanticVerifications;
+    state.semanticSupport = source.semanticSupport;
+    state.semanticVerifierModel = source.semanticVerifierModel;
+    state.semanticVerifiedAt = source.semanticVerifiedAt;
+    state.semanticVerifiedContentHash = source.contentHash;
+    await writeFile(statePath, JSON.stringify(state, null, 2));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`${source.id}: could not persist semantic verdict to snapshot state: ${message}`);
+  }
+}
+
 const feed = JSON.parse(await readFile(feedPath, 'utf8'));
 let attempted = 0;
 let completed = 0;
@@ -134,6 +157,8 @@ for (const source of feed.sources ?? []) {
   source.semanticSupport = aggregate(semanticVerifications, claims.length);
   source.semanticVerifierModel = model;
   source.semanticVerifiedAt = new Date().toISOString();
+  source.semanticVerifiedContentHash = source.contentHash;
+  await persistSourceState(source);
 }
 
 feed.semanticVerification = {
