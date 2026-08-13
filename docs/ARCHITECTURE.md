@@ -2,7 +2,7 @@
 
 ## Product thesis
 
-Most immigration assistants answer questions. Cristóvão builds a **living digital twin of a journey** and makes the dependency chain inspectable.
+Most assistants answer the current question. Cristóvão builds a **living digital twin of a journey** and makes the dependency chain inspectable.
 
 The core interaction is:
 
@@ -10,16 +10,17 @@ The core interaction is:
 
 ## Trust boundary
 
-Cristóvão is an informational navigation and preparation tool. It is not legal advice and must not predict case outcomes.
+Cristóvão is an informational navigation and preparation tool. It is not legal advice and does not predict case outcomes.
 
 The implementation keeps these concepts separate:
 
 1. **Fact** — provided by the user or extracted from a document.
-2. **Rule** — tied to a versioned authoritative source.
-3. **Inference** — AI reasoning that combines facts and rules.
+2. **Rule / evidence** — tied to a versioned authoritative source.
+3. **Inference** — AI interpretation that never directly approves a graph node.
 4. **Unknown** — information required before the system can safely conclude.
 5. **Matched passage** — deterministic evidence extraction, not a semantic verdict.
-6. **Semantic verdict** — an independent model judgment that still cannot directly approve a node.
+6. **Semantic verdict** — an independent model classification.
+7. **Verification state** — assigned by deterministic code after all gates are evaluated.
 
 ## Current architecture
 
@@ -29,22 +30,26 @@ Natural-language intake
         v
 Structured Digital Twin
         |
-        +--> Unknown detector
-        |
+        +--> Explicit unknowns
         +--> Document facts
+        +--> Saved checkpoint
         |
         v
-Journey Compiler ----------> What-if Scenario Engine
-        |                           |
-        v                           v
-Proposed JourneyGraph -----> Impact propagation
+Journey Compiler -----------------> What-if / source impact
+        |                                  |
+        v                                  v
+JourneyGraph ----------------------> selective invalidation
+        |
+        +--> Timeline
+        +--> Explain Graph
         |
         v
 Authoritative Source Intelligence
         |
-        +--> snapshot + SHA-256 + version
-        |
+        +--> versioned snapshot
+        +--> SHA-256 fingerprint
         +--> deterministic passage matching
+        +--> change detection
         |
         v
 Evidence Ledger
@@ -56,76 +61,176 @@ Independent Semantic Verifier
 Deterministic Verification Gate
         |
         v
-Verified / Needs-review / Rejected JourneyGraph
+Verified / Needs-review / Rejected
 ```
+
+## Runtime / persistence architecture
+
+```text
+Browser UI
+   |
+   v
+Render Web Service
+   |
+   +--> structured-intake API
+   +--> synthetic-document extraction API
+   +--> checkpoint / compare API
+   +--> live evidence-feed API
+   |
+   +-----------------------> Render Key Value
+   |                           |
+   |                           +--> latest evidence feed
+   |                           +--> source snapshots
+   |                           +--> journey checkpoint
+   |
+   +-----------------------> Supermemory
+                               |
+                               +--> semantic checkpoint history
+
+Render Workflow
+   |
+   +--> load previous source state
+   +--> snapshot official sources
+   +--> verify matched claims
+   +--> persist source state
+   +--> publish evidence feed
+```
+
+The deterministic checkpoint stored in Render Key Value remains the comparison source of truth. Supermemory is a separate semantic-history sink and is not used to decide whether two snapshots are equal.
 
 ## Why the Journey Compiler is deterministic-first
 
-Dates, graph traversal, dependency propagation, required-field validation, evidence-state transitions, and readiness calculation should be deterministic when possible. AI is used where semantic interpretation is necessary, but it is surrounded by explicit schemas, provenance, and abstention paths.
+Dates, graph traversal, dependency propagation, required-field validation, evidence-state transitions, checkpoint comparison, and known-date ordering are deterministic when possible.
 
-## Official source flow
+AI is used where semantic interpretation is necessary:
 
-The current prototype monitors:
+- natural-language structuring,
+- multimodal synthetic document understanding,
+- claim-to-passage semantic verification.
 
-- USCIS Policy Manual
-- U.S. Department of State August 2026 Visa Bulletin
+Those AI paths are surrounded by explicit schemas, provenance, confidence/status fields, and abstention paths.
 
-The State Department can return HTTP 403 to Node clients, so Cristóvão supports an official PDF fallback and browser-assisted official-file import. Fetch failures are recorded rather than hidden.
+## Document reconciliation
 
-For the August 2026 bulletin, deterministic extraction currently isolates:
+Document extraction and the user/profile state remain separate observations until reconciliation.
 
-- EB-2 India Final Action value
-- EB-2 India Dates-for-Filing value
-- EB-2 availability-warning passage
+If two observed values disagree, Cristóvão does not silently select one. The discrepancy remains visible and is propagated to connected graph/timeline state.
 
-Locating those passages does **not** verify the related claims.
+The synthetic demo intentionally includes a date conflict so reviewers can see that behavior directly.
+
+## Timeline model
+
+The timeline only orders exact dates that already exist in the Digital Twin or extracted document state.
+
+If an exact date is missing, the item remains **UNSCHEDULED**. The system does not estimate legal dates merely to create a complete-looking timeline.
+
+## Official-source flow
+
+The prototype uses authoritative USCIS and U.S. Department of State evidence.
+
+For registered sources the pipeline retains:
+
+- publisher / URL,
+- retrieval timestamp,
+- source version,
+- content hash,
+- matched passage,
+- claim-verification state,
+- declared dependent JourneyGraph node IDs.
+
+A source fingerprint change invalidates only declared dependents.
+
+A changed fingerprint alone does **not** prove that the meaning of a rule changed. Semantic support must be re-established for the new retained content.
 
 ## Independent semantic verifier
 
-The Journey Planner cannot grade itself. A separate Gemini-based verifier receives only:
+The Journey Planner cannot grade itself.
+
+A separate Gemini-based verifier receives:
 
 - one explicit claim, and
-- one already-matched official passage.
+- one already-matched source passage.
 
-It does not receive the user's broader profile, planner rationale, or web-search results. It is instructed to use only the supplied passage and return one structured classification:
+It returns one structured classification:
 
 - `supported`
 - `contradicted`
 - `uncertain`
 
-API/runtime failure remains `not-run`; it is not converted into an AI verdict.
+API/runtime failure remains `not-run`; it is not converted into a judgment.
 
 ## Deterministic acceptance gate
 
-The model never marks a JourneyGraph node verified. Code requires all of the following:
+The model never marks a JourneyGraph node verified. Code requires the configured evidence checks to pass, including:
 
-1. HTTPS source
-2. approved authoritative domain
-3. matched passage
-4. source version + retrieval timestamp + content hash
-5. retained evidence passage
-6. independent semantic verdict of `supported`
+1. HTTPS source.
+2. approved authoritative domain.
+3. matched passage.
+4. source version + retrieval timestamp + content hash.
+5. retained evidence passage.
+6. independent semantic verdict of `supported`.
 
 A contradiction rejects the attached evidence. Missing or uncertain checks keep the node under review.
 
+## Decision trace
+
+The graph inspector follows relationships already present in the current Digital Twin:
+
+- `dependsOn` edges,
+- linked evidence IDs,
+- evidence `supports` relationships,
+- current verification / impact state.
+
+The trace is therefore structural rather than a generated explanation that could invent a dependency.
+
+## Memory model
+
+Saving a checkpoint produces two intentionally separate paths:
+
+### Deterministic checkpoint
+
+Used by **What changed?** to compare the current Digital Twin against the saved baseline.
+
+Collections compared include:
+
+- facts,
+- unknowns,
+- graph nodes,
+- evidence.
+
+### Semantic history
+
+When configured, a serialized checkpoint is also submitted to a scoped Supermemory container. This supports durable semantic history without replacing the deterministic state comparison.
+
+## Judge Mode
+
+Judge Mode is presentation-only. It does not add reasoning or bypass real controls.
+
+It provides a movable presenter guide for the expected sequence:
+
+```text
+build state
+ → save checkpoint
+ → analyze synthetic document
+ → inspect timeline
+ → explain graph
+ → simulate source change
+ → compare with checkpoint
+```
+
+## Validation
+
+The repository uses:
+
+- Vitest unit tests,
+- Render Workflow TypeScript checks,
+- server TypeScript checks,
+- production Vite build,
+- Web API smoke test,
+- GitHub Actions on pull requests.
+
 ## Safety model
 
-Synthetic data is used for the hackathon demo. Cristóvão deliberately separates user facts, official evidence, deterministic extraction, AI semantic judgments, unknowns, and final verification state.
+Synthetic data is used for the hackathon demo. Cristóvão deliberately separates user facts, document observations, official evidence, deterministic extraction, AI semantic judgments, unknowns, and final verification state.
 
-## Next implementation slices
-
-### Render Workflow orchestration
-
-Move source snapshotting, extraction, semantic verification, and impact recomputation into a long-running workflow with persistent source state.
-
-### AI intake
-
-Replace the demo keyword compiler with structured model output validated against the Digital Twin schema. Critical dates remain unverified until corroborated by explicit input or documents.
-
-### Document intelligence
-
-Extract structured facts from synthetic immigration documents and compare them with user-entered facts. Discrepancies should become explicit unknowns rather than silent overwrites.
-
-### Change intelligence
-
-When a source changes, recompute affected claims and semantic verdicts, then mark only dependent JourneyGraph nodes for re-verification.
+The desired failure mode is visible uncertainty, not fabricated certainty.
