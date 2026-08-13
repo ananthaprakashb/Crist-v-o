@@ -8,6 +8,7 @@ function feed(
   status: 'first-snapshot' | 'changed',
   semanticSupport?: 'supported' | 'contradicted' | 'uncertain' | 'not-run',
   semanticHash = 'abc123',
+  semanticFingerprint = 'evidence-1',
 ): SourceIntelligenceFeed {
   return {
     generatedAt: '2026-08-13T06:30:00.000Z',
@@ -22,17 +23,20 @@ function feed(
         sourceVersion: 'August 2026',
         contentHash: 'abc123',
         previousHash: status === 'changed' ? 'old123' : undefined,
+        evidenceFingerprint: 'evidence-1',
         matchedClaims: [
           {
             claimId: 'eb2-india-final-action',
             label: 'EB-2 India final action status',
             value: 'U',
-            passage: '2nd C 01SEP21 U C C',
+            passage: 'FINAL ACTION DATES\nEmployment-based ... INDIA ...\n2nd C 01SEP21 U C C',
             matchType: 'deterministic-table-row',
           },
         ],
         semanticSupport,
         semanticVerifiedContentHash: semanticSupport && semanticSupport !== 'not-run' ? semanticHash : undefined,
+        semanticVerifiedEvidenceFingerprint:
+          semanticSupport && semanticSupport !== 'not-run' ? semanticFingerprint : undefined,
         semanticVerifications: semanticSupport && semanticSupport !== 'not-run'
           ? [
               {
@@ -66,7 +70,7 @@ describe('Source Intelligence', () => {
     expect(result.changedNodeIds).toEqual([]);
   });
 
-  it('applies an independent semantic verdict only when it belongs to the current content hash', () => {
+  it('applies an independent semantic verdict only when it belongs to the current source and evidence bundle', () => {
     const twin = compileJourney(syntheticCase);
     const result = applySourceIntelligence(twin, feed('first-snapshot', 'supported'));
     const evidence = result.twin.evidence.find((item) => item.id === 'visa-bulletin-2026-08');
@@ -75,9 +79,17 @@ describe('Source Intelligence', () => {
     expect(evidence?.semanticSupport).toBe('supported');
   });
 
-  it('invalidates a stale semantic verdict when its verified hash differs from the current source hash', () => {
+  it('invalidates a stale semantic verdict when its verified source hash differs', () => {
     const twin = compileJourney(syntheticCase);
     const result = applySourceIntelligence(twin, feed('first-snapshot', 'supported', 'stale-hash'));
+    const evidence = result.twin.evidence.find((item) => item.id === 'visa-bulletin-2026-08');
+
+    expect(evidence?.semanticSupport).toBe('not-run');
+  });
+
+  it('invalidates a semantic verdict when the matched evidence bundle changes', () => {
+    const twin = compileJourney(syntheticCase);
+    const result = applySourceIntelligence(twin, feed('first-snapshot', 'supported', 'abc123', 'old-evidence'));
     const evidence = result.twin.evidence.find((item) => item.id === 'visa-bulletin-2026-08');
 
     expect(evidence?.semanticSupport).toBe('not-run');
