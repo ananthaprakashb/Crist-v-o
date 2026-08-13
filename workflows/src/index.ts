@@ -172,7 +172,7 @@ export const snapshotOfficialSources = task(
       try {
         let normalizedText = '';
         let hashInput: string | Buffer;
-        let observedUrl = source.url;
+        let observedUrl: string = source.url;
         let retrievalMode = 'html';
         let contentType = 'text/html';
 
@@ -309,7 +309,7 @@ async function semanticVerification(source: SourceRecord, claim: MatchedClaim): 
       },
     },
   });
-  const parsed = JSON.parse(interaction.output_text) as { verdict: Exclude<ClaimVerdict, 'not-run'>; confidence: 'high' | 'medium' | 'low'; rationale: string };
+  const parsed = JSON.parse(interaction.output_text ?? '') as { verdict: Exclude<ClaimVerdict, 'not-run'>; confidence: 'high' | 'medium' | 'low'; rationale: string };
   return {
     claimId: claim.claimId,
     verdict: parsed.verdict,
