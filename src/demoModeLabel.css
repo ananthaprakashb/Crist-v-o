@@ -1,0 +1,9 @@
+.source-demo-drawer:has(.source-demo-mode.synthetic) .source-demo-nodes .source-demo-section-title span {
+  font-size: 0;
+}
+
+.source-demo-drawer:has(.source-demo-mode.synthetic) .source-demo-nodes .source-demo-section-title span::after {
+  content: 'Synthetic source change active';
+  font-size: .8rem;
+  font-weight: 700;
+}
