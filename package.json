@@ -1,0 +1,40 @@
+{
+  "name": "cristovao-the-caregiver",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20 <25"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "sources:snapshot": "node scripts/snapshotSources.mjs",
+    "sources:import": "node scripts/importSourceFile.mjs",
+    "sources:verify": "node scripts/verifySourceClaims.mjs",
+    "sources:status": "node scripts/sourceStatus.mjs",
+    "workflows:start": "tsx workflows/src/index.ts",
+    "workflows:dev": "render workflows dev -- npx tsx workflows/src/index.ts",
+    "workflows:check": "tsc -p workflows/tsconfig.json"
+  },
+  "dependencies": {
+    "@google/genai": "latest",
+    "@renderinc/sdk": "^0.6.0",
+    "ioredis": "^5.7.0",
+    "pdfjs-dist": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "tsx": "^4.20.0",
+    "typescript": "latest",
+    "vite": "latest",
+    "vitest": "latest"
+  }
+}
