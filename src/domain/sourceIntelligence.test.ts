@@ -18,6 +18,15 @@ function feed(status: 'first-snapshot' | 'changed'): SourceIntelligenceFeed {
         sourceVersion: 'August 2026',
         contentHash: 'abc123',
         previousHash: status === 'changed' ? 'old123' : undefined,
+        matchedClaims: [
+          {
+            claimId: 'eb2-india-final-action',
+            label: 'EB-2 India final action status',
+            value: 'U',
+            passage: '2nd C 01SEP21 U C C',
+            matchType: 'deterministic-table-row',
+          },
+        ],
         affectedNodeIds: ['authoritative-evidence', 'priority-monitoring', 'next-milestone'],
       },
     ],
@@ -25,13 +34,16 @@ function feed(status: 'first-snapshot' | 'changed'): SourceIntelligenceFeed {
 }
 
 describe('Source Intelligence', () => {
-  it('adds snapshot provenance without pretending a first snapshot is a policy change', () => {
+  it('adds snapshot provenance and matched passages without pretending semantic verification ran', () => {
     const twin = compileJourney(syntheticCase);
     const result = applySourceIntelligence(twin, feed('first-snapshot'));
     const evidence = result.twin.evidence.find((item) => item.id === 'visa-bulletin-2026-08');
 
     expect(evidence?.sourceVersion).toBe('August 2026');
     expect(evidence?.contentHash).toBe('abc123');
+    expect(evidence?.matchStatus).toBe('matched');
+    expect(evidence?.passage).toContain('EB-2 India final action status (U)');
+    expect(evidence?.semanticSupport).toBe('not-run');
     expect(result.changedNodeIds).toEqual([]);
   });
 
