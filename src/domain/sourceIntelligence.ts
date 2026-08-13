@@ -1,6 +1,6 @@
 import type { DigitalTwin } from './types';
 
-export type SourceRunStatus = 'not-run' | 'first-snapshot' | 'unchanged' | 'changed' | 'error';
+export type SourceRunStatus = 'not-run' | 'first-snapshot' | 'unchanged' | 'changed' | 'refresh-blocked' | 'error';
 
 export interface SourceFeedRecord {
   id: string;
@@ -12,6 +12,12 @@ export interface SourceFeedRecord {
   sourceVersion?: string;
   contentHash?: string;
   previousHash?: string;
+  observedUrl?: string;
+  retrievalMode?: 'html' | 'official-pdf-fallback' | 'manual-official-file';
+  contentType?: string;
+  localFileName?: string;
+  provenanceNote?: string;
+  primaryFetchError?: string;
   affectedNodeIds: string[];
   changeSummary?: {
     added: string[];
