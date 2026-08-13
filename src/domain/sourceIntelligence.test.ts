@@ -4,7 +4,10 @@ import { applySourceIntelligence, type SourceIntelligenceFeed } from './sourceIn
 
 const syntheticCase = `I am on H-1B. My spouse and child are dependents. My employer started an employment-based green card process.`;
 
-function feed(status: 'first-snapshot' | 'changed'): SourceIntelligenceFeed {
+function feed(
+  status: 'first-snapshot' | 'changed',
+  semanticSupport?: 'supported' | 'contradicted' | 'uncertain' | 'not-run',
+): SourceIntelligenceFeed {
   return {
     generatedAt: '2026-08-13T06:30:00.000Z',
     sources: [
@@ -27,6 +30,20 @@ function feed(status: 'first-snapshot' | 'changed'): SourceIntelligenceFeed {
             matchType: 'deterministic-table-row',
           },
         ],
+        semanticSupport,
+        semanticVerifications: semanticSupport && semanticSupport !== 'not-run'
+          ? [
+              {
+                claimId: 'eb2-india-final-action',
+                claim: 'In the August 2026 Visa Bulletin Final Action Dates table, the EB-2 India value is U.',
+                verdict: semanticSupport,
+                confidence: 'high',
+                rationale: 'Synthetic verifier result for domain integration testing.',
+                model: 'test-verifier',
+                verifiedAt: '2026-08-13T06:31:00.000Z',
+              },
+            ]
+          : undefined,
         affectedNodeIds: ['authoritative-evidence', 'priority-monitoring', 'next-milestone'],
       },
     ],
@@ -45,6 +62,15 @@ describe('Source Intelligence', () => {
     expect(evidence?.passage).toContain('EB-2 India final action status (U)');
     expect(evidence?.semanticSupport).toBe('not-run');
     expect(result.changedNodeIds).toEqual([]);
+  });
+
+  it('applies an independent semantic verdict only when the feed contains one', () => {
+    const twin = compileJourney(syntheticCase);
+    const result = applySourceIntelligence(twin, feed('first-snapshot', 'supported'));
+    const evidence = result.twin.evidence.find((item) => item.id === 'visa-bulletin-2026-08');
+
+    expect(evidence?.matchStatus).toBe('matched');
+    expect(evidence?.semanticSupport).toBe('supported');
   });
 
   it('propagates a changed source only to declared dependent nodes', () => {
