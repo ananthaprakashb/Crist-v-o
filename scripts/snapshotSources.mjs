@@ -118,18 +118,24 @@ async function fetchOfficialSource(source) {
   } catch (primaryError) {
     if (!source.fallbackUrl) throw primaryError;
 
-    const response = await fetchResponse(source.fallbackUrl, 'application/pdf');
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (bytes.length < 500) throw new Error('Official PDF fallback was unexpectedly small.');
+    try {
+      const response = await fetchResponse(source.fallbackUrl, 'application/pdf');
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length < 500) throw new Error('Official PDF fallback was unexpectedly small.');
 
-    return {
-      observedUrl: response.url || source.fallbackUrl,
-      retrievalMode: 'official-pdf-fallback',
-      contentType: response.headers.get('content-type') ?? 'application/pdf',
-      normalizedText: '',
-      hashInput: bytes,
-      primaryError: primaryError instanceof Error ? primaryError.message : String(primaryError),
-    };
+      return {
+        observedUrl: response.url || source.fallbackUrl,
+        retrievalMode: 'official-pdf-fallback',
+        contentType: response.headers.get('content-type') ?? 'application/pdf',
+        normalizedText: '',
+        hashInput: bytes,
+        primaryError: primaryError instanceof Error ? primaryError.message : String(primaryError),
+      };
+    } catch (fallbackError) {
+      const primary = primaryError instanceof Error ? primaryError.message : String(primaryError);
+      const fallback = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+      throw new Error(`HTML fetch blocked (${primary}); official PDF fetch also blocked (${fallback}).`);
+    }
   }
 }
 
@@ -170,11 +176,29 @@ async function snapshot(source) {
       changeSummary: changed ? diffSummary(previous?.normalizedText, fetched.normalizedText) : { added: [], removed: [] },
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (previous?.contentHash) {
+      return {
+        ...source,
+        status: 'refresh-blocked',
+        retrievedAt: previous.retrievedAt,
+        sourceVersion: previous.sourceVersion,
+        contentHash: previous.contentHash,
+        observedUrl: previous.observedUrl,
+        retrievalMode: previous.retrievalMode,
+        contentType: previous.contentType,
+        localFileName: previous.localFileName,
+        provenanceNote: previous.provenanceNote,
+        affectedNodeIds: source.affectedNodeIds,
+        error: `Refresh attempt blocked; retaining last known snapshot. ${message}`,
+      };
+    }
+
     return {
       ...source,
       status: 'error',
       affectedNodeIds: source.affectedNodeIds,
-      error: error instanceof Error ? error.message : String(error),
+      error: `${message} Download the official bulletin in a browser and import it with npm run sources:import -- ${source.id} "<path-to-file>".`,
     };
   }
 }
@@ -189,8 +213,8 @@ const feed = { generatedAt: new Date().toISOString(), sources };
 await writeFile(feedPath, JSON.stringify(feed, null, 2));
 
 for (const source of sources) {
-  if (source.status === 'error') {
-    console.log(`${source.id}: error: ${source.error}`);
+  if (source.status === 'error' || source.status === 'refresh-blocked') {
+    console.log(`${source.id}: ${source.status}: ${source.error}`);
     continue;
   }
 
