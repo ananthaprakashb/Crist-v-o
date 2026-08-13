@@ -68,7 +68,7 @@ The deterministic matcher proves that a passage was located; it does **not** dec
 
 Cristóvão uses the Gemini API only as an independent claim-to-passage classifier. The verifier receives the claim plus its already-matched official passage and is explicitly instructed not to use outside knowledge, make eligibility decisions, predict approval, or provide legal advice.
 
-Set a Gemini API key and run:
+After `npm run sources:snapshot` reports matched passages, set a Gemini API key and run:
 
 ```bash
 npm run sources:verify
@@ -94,6 +94,8 @@ Each claim receives one structured verdict:
 - `uncertain`
 
 An API/runtime failure is stored as `not-run`; it is never converted into an AI judgment. The source-level semantic result is deterministic: any contradiction rejects the source claim set, any uncertainty keeps it under review, and only complete support can satisfy the semantic verification gate.
+
+After verification, restart or refresh the Vite app so the Evidence Ledger consumes the updated `public/source-intelligence.json` feed.
 
 ### Automated validation
 
