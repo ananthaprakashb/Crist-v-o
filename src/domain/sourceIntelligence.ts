@@ -2,6 +2,14 @@ import type { DigitalTwin } from './types';
 
 export type SourceRunStatus = 'not-run' | 'first-snapshot' | 'unchanged' | 'changed' | 'refresh-blocked' | 'error';
 
+export interface MatchedSourceClaim {
+  claimId: string;
+  label: string;
+  value?: string;
+  passage: string;
+  matchType: 'deterministic-table-row' | 'deterministic-section-anchor';
+}
+
 export interface SourceFeedRecord {
   id: string;
   title: string;
@@ -18,6 +26,8 @@ export interface SourceFeedRecord {
   localFileName?: string;
   provenanceNote?: string;
   primaryFetchError?: string;
+  extractionError?: string;
+  matchedClaims?: MatchedSourceClaim[];
   affectedNodeIds: string[];
   changeSummary?: {
     added: string[];
@@ -56,6 +66,14 @@ export function applySourceIntelligence(
       evidence.retrievedAt = source.retrievedAt;
       evidence.sourceVersion = source.sourceVersion;
       evidence.contentHash = source.contentHash;
+
+      const matchedClaims = source.matchedClaims ?? [];
+      if (matchedClaims.length > 0) {
+        evidence.matchStatus = 'matched';
+        evidence.passage = matchedClaims
+          .map((claim) => `${claim.label}${claim.value ? ` (${claim.value})` : ''}: ${claim.passage}`)
+          .join('\n\n');
+      }
     }
 
     if (source.status !== 'changed') continue;
