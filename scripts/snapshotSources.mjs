@@ -96,6 +96,25 @@ async function readPrevious(id) {
   }
 }
 
+function semanticStateFor(previous, contentHash, changed) {
+  const valid = !changed && previous?.semanticVerifiedContentHash === contentHash;
+  return valid
+    ? {
+        semanticSupport: previous.semanticSupport ?? 'not-run',
+        semanticVerifications: previous.semanticVerifications,
+        semanticVerifierModel: previous.semanticVerifierModel,
+        semanticVerifiedAt: previous.semanticVerifiedAt,
+        semanticVerifiedContentHash: previous.semanticVerifiedContentHash,
+      }
+    : {
+        semanticSupport: 'not-run',
+        semanticVerifications: undefined,
+        semanticVerifierModel: undefined,
+        semanticVerifiedAt: undefined,
+        semanticVerifiedContentHash: undefined,
+      };
+}
+
 async function fetchResponse(url, accept) {
   const response = await fetch(url, {
     redirect: 'follow',
@@ -166,6 +185,7 @@ async function snapshot(source) {
     const status = !previous?.contentHash ? 'first-snapshot' : changed ? 'changed' : 'unchanged';
     const sourceVersion = versionFor(source, fetched.normalizedText, contentHash);
     const matchedClaims = matchedClaimsFor(source, fetched.normalizedText);
+    const semanticState = semanticStateFor(previous, contentHash, changed);
     const state = {
       id: source.id,
       retrievedAt,
@@ -177,6 +197,7 @@ async function snapshot(source) {
       normalizedText: fetched.normalizedText ? fetched.normalizedText.slice(0, 250000) : undefined,
       matchedClaims,
       extractionError: fetched.extractionError,
+      ...semanticState,
     };
 
     await writeFile(path.join(stateDir, `${source.id}.json`), JSON.stringify(state, null, 2));
@@ -194,12 +215,14 @@ async function snapshot(source) {
       primaryFetchError: fetched.primaryError,
       extractionError: fetched.extractionError,
       matchedClaims,
+      ...semanticState,
       affectedNodeIds: source.affectedNodeIds,
       changeSummary: changed ? diffSummary(previous?.normalizedText, fetched.normalizedText) : { added: [], removed: [] },
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (previous?.contentHash) {
+      const semanticState = semanticStateFor(previous, previous.contentHash, false);
       return {
         ...source,
         status: 'refresh-blocked',
@@ -213,6 +236,7 @@ async function snapshot(source) {
         provenanceNote: previous.provenanceNote,
         matchedClaims: previous.matchedClaims ?? [],
         extractionError: previous.extractionError,
+        ...semanticState,
         affectedNodeIds: source.affectedNodeIds,
         error: `Refresh attempt blocked; retaining last known snapshot. ${message}`,
       };
@@ -221,6 +245,7 @@ async function snapshot(source) {
     return {
       ...source,
       status: 'error',
+      semanticSupport: 'not-run',
       affectedNodeIds: source.affectedNodeIds,
       error: `${message} Download the official bulletin in a browser and import it with npm run sources:import -- ${source.id} "<path-to-file>".`,
     };
@@ -244,6 +269,7 @@ for (const source of sources) {
 
   const mode = source.retrievalMode === 'official-pdf-fallback' ? ' (official PDF fallback)' : '';
   const matches = source.matchedClaims?.length ? ` · ${source.matchedClaims.length} evidence passages matched` : '';
+  const semantic = source.semanticSupport && source.semanticSupport !== 'not-run' ? ` · semantic ${source.semanticSupport}` : '';
   const extraction = source.extractionError ? ` · extraction warning: ${source.extractionError}` : '';
-  console.log(`${source.id}: ${source.status} ${source.sourceVersion ?? ''}${mode}${matches}${extraction}`);
+  console.log(`${source.id}: ${source.status} ${source.sourceVersion ?? ''}${mode}${matches}${semantic}${extraction}`);
 }
