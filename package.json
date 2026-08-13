@@ -10,7 +10,8 @@
     "test": "vitest run",
     "sources:snapshot": "node scripts/snapshotSources.mjs",
     "sources:import": "node scripts/importSourceFile.mjs",
-    "sources:verify": "node scripts/verifySourceClaims.mjs"
+    "sources:verify": "node scripts/verifySourceClaims.mjs",
+    "sources:status": "node scripts/sourceStatus.mjs"
   },
   "dependencies": {
     "@google/genai": "latest",
