@@ -5,6 +5,7 @@ import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Redis } from 'ioredis';
 import { analyzeI797File, analyzeSyntheticI797, structureIntake } from './intelligenceRuntime.js';
+import { handleCheckpointApi } from './checkpointApi.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
 const HOST = process.env.HOST ?? '0.0.0.0';
@@ -106,6 +107,8 @@ createServer(async (request, response) => {
         ? json(response, 200, await analyzeI797File(mimeType, data))
         : json(response, 400, { error: 'document-data-required' });
     }
+
+    if (await handleCheckpointApi(request, response, url, json, body)) return;
 
     if (request.method === 'GET' && url.pathname === '/source-intelligence.json') {
       const feed = await latestFeed();
