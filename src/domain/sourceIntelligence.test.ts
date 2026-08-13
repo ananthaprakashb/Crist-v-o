@@ -7,6 +7,7 @@ const syntheticCase = `I am on H-1B. My spouse and child are dependents. My empl
 function feed(
   status: 'first-snapshot' | 'changed',
   semanticSupport?: 'supported' | 'contradicted' | 'uncertain' | 'not-run',
+  semanticHash = 'abc123',
 ): SourceIntelligenceFeed {
   return {
     generatedAt: '2026-08-13T06:30:00.000Z',
@@ -31,6 +32,7 @@ function feed(
           },
         ],
         semanticSupport,
+        semanticVerifiedContentHash: semanticSupport && semanticSupport !== 'not-run' ? semanticHash : undefined,
         semanticVerifications: semanticSupport && semanticSupport !== 'not-run'
           ? [
               {
@@ -64,13 +66,21 @@ describe('Source Intelligence', () => {
     expect(result.changedNodeIds).toEqual([]);
   });
 
-  it('applies an independent semantic verdict only when the feed contains one', () => {
+  it('applies an independent semantic verdict only when it belongs to the current content hash', () => {
     const twin = compileJourney(syntheticCase);
     const result = applySourceIntelligence(twin, feed('first-snapshot', 'supported'));
     const evidence = result.twin.evidence.find((item) => item.id === 'visa-bulletin-2026-08');
 
     expect(evidence?.matchStatus).toBe('matched');
     expect(evidence?.semanticSupport).toBe('supported');
+  });
+
+  it('invalidates a stale semantic verdict when its verified hash differs from the current source hash', () => {
+    const twin = compileJourney(syntheticCase);
+    const result = applySourceIntelligence(twin, feed('first-snapshot', 'supported', 'stale-hash'));
+    const evidence = result.twin.evidence.find((item) => item.id === 'visa-bulletin-2026-08');
+
+    expect(evidence?.semanticSupport).toBe('not-run');
   });
 
   it('propagates a changed source only to declared dependent nodes', () => {
