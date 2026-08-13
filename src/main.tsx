@@ -1,11 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App';
+import CristovaoApp from './CristovaoApp';
 import './styles.css';
 import './sourceIntelligence.css';
+import './intelligence.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <CristovaoApp />
   </StrictMode>,
 );
