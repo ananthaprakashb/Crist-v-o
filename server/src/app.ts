@@ -4,7 +4,7 @@ import { stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Redis } from 'ioredis';
-import { analyzeI797File, analyzeSyntheticI797, structureIntake } from './intelligence.js';
+import { analyzeI797File, analyzeSyntheticI797, structureIntake } from './intelligenceRuntime.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
 const HOST = process.env.HOST ?? '0.0.0.0';
