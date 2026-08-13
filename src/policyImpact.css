@@ -1,0 +1,27 @@
+.policy-impact { display: grid; gap: 18px; }
+.policy-impact-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.policy-reset { border: 1px solid rgba(24,58,49,.22); background: transparent; color: inherit; }
+.policy-impact-intro { margin: -4px 0 0; max-width: 920px; opacity: .76; line-height: 1.65; }
+.policy-empty, .policy-impact-card { border: 1px solid rgba(24,58,49,.14); border-radius: 20px; padding: 20px; }
+.policy-empty { display: grid; gap: 6px; border-style: dashed; }
+.policy-impact-card { display: grid; gap: 18px; background: rgba(255,252,239,.72); }
+.policy-impact-topline, .policy-impact-title, .policy-subheading, .policy-node, .policy-claim { display: flex; justify-content: space-between; gap: 14px; align-items: center; }
+.policy-mode, .policy-review { border-radius: 999px; padding: 6px 10px; font-size: .72rem; font-weight: 800; letter-spacing: .06em; }
+.policy-mode.synthetic { background: rgba(203,133,38,.13); }
+.policy-mode.live, .policy-review.current { background: rgba(36,112,87,.12); }
+.policy-review.required { background: rgba(174,75,54,.12); }
+.policy-impact-title > div, .policy-node > div, .policy-claim > div { display: grid; gap: 4px; }
+.policy-impact-title h3 { margin: 0; }
+.policy-impact-title span, .policy-snapshot-flow span, .policy-trust-grid span, .policy-subheading span, .policy-node span, .policy-claim span { opacity: .66; font-size: .82rem; }
+.policy-snapshot-flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 10px; align-items: center; }
+.policy-snapshot-flow > div { border: 1px solid rgba(24,58,49,.12); border-radius: 15px; padding: 14px; display: grid; gap: 8px; min-width: 0; }
+.policy-snapshot-flow strong { overflow-wrap: anywhere; font-size: .9rem; }
+.policy-trust-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.policy-trust-grid > div { border-radius: 15px; padding: 16px; display: grid; gap: 7px; }
+.policy-knows { background: rgba(36,112,87,.08); }
+.policy-does-not-claim { background: rgba(203,133,38,.09); }
+.policy-trust-grid p { margin: 0; line-height: 1.55; opacity: .76; }
+.policy-node-list, .policy-claim-list { border-top: 1px solid rgba(24,58,49,.1); padding-top: 14px; display: grid; gap: 8px; }
+.policy-node, .policy-claim { padding: 10px 0; border-bottom: 1px solid rgba(24,58,49,.08); }
+.policy-change-summary { display: grid; gap: 7px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; opacity: .72; }
+@media (max-width: 760px) { .policy-snapshot-flow, .policy-trust-grid { grid-template-columns: 1fr; } .policy-snapshot-flow > b { transform: rotate(90deg); justify-self: center; } }
