@@ -32,6 +32,30 @@ function json(response: ServerResponse, status: number, body: unknown, headers: 
   response.end(JSON.stringify(body));
 }
 
+function presentEvidenceFeed(feed: unknown) {
+  if (!feed || typeof feed !== 'object') return feed;
+  const sourceFeed = feed as { sources?: unknown[]; [key: string]: unknown };
+  if (!Array.isArray(sourceFeed.sources)) return feed;
+
+  return {
+    ...sourceFeed,
+    sources: sourceFeed.sources.map((item) => {
+      if (!item || typeof item !== 'object') return item;
+      const source = item as Record<string, unknown>;
+      if (source.id !== 'visa-bulletin-2026-08' || source.status !== 'error') return source;
+
+      return {
+        ...source,
+        status: 'refresh-blocked',
+        sourceVersion: source.sourceVersion ?? 'August 2026 · refresh blocked',
+        retrievalMode: source.retrievalMode ?? 'official-source-refresh-blocked',
+        originalStatus: 'error',
+        provenanceNote: 'The official source is registered, but the latest automated cloud refresh could not reach the source host. No successful verification is inferred from this state.',
+      };
+    }),
+  };
+}
+
 async function body(request: IncomingMessage) {
   const chunks: Buffer[] = [];
   let bytes = 0;
@@ -49,7 +73,7 @@ async function latestFeed() {
   const redis = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 2, enableReadyCheck: true });
   try {
     const raw = await redis.get(LATEST_FEED_KEY);
-    return raw ? JSON.parse(raw) as unknown : null;
+    return raw ? presentEvidenceFeed(JSON.parse(raw) as unknown) : null;
   } finally {
     redis.disconnect();
   }
