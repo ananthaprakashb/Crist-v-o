@@ -17,7 +17,10 @@ FOR THE LATEST INFORMATION
 export function referenceSeedFor(sourceId: string) {
   if (sourceId !== 'visa-bulletin-2026-08') return null;
 
-  const matchedClaims = extractVisaBulletinClaims(AUGUST_2026_EMPLOYMENT_EXCERPT);
+  const matchedClaims = extractVisaBulletinClaims(AUGUST_2026_EMPLOYMENT_EXCERPT).map((claim: any) => ({
+    ...claim,
+    claimId: `reference-${claim.claimId}`,
+  }));
   return {
     id: sourceId,
     title: 'Visa Bulletin for August 2026',
