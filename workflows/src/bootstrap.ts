@@ -1,3 +1,5 @@
+import { seedReferenceStateIfNeeded } from './seedState.js';
+
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
 function officialSourceHeaders(input: string, init?: RequestInit) {
@@ -25,4 +27,5 @@ globalThis.fetch = (async (input: URL | RequestInfo, init?: RequestInit) => {
   return nativeFetch(input, { ...init, headers: officialSourceHeaders(inputUrl, init) });
 }) as typeof fetch;
 
+await seedReferenceStateIfNeeded();
 await import('./index.js');
