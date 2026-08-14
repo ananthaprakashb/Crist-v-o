@@ -4,11 +4,14 @@ Target runtime: **2:40–2:55**. Use only synthetic demo data.
 
 ## Before recording
 
-1. Start the latest build.
+1. Start the latest production build.
 2. Confirm the evidence feed is already loaded.
-3. Configure `SUPERMEMORY_API_KEY` if the semantic checkpoint indicator should show `submitted`.
-4. Click **Judge demo → Reset demo state**.
-5. Use a browser zoom level where the graph and floating controls remain readable.
+3. Confirm the Department of State source card is stable: `REFRESH-BLOCKED`, `August 2026`, and a **non-empty hash**. Do not wait for or retry the government host during the recording.
+4. Confirm the Render Workflow and Web Service are using the same Render Key Value instance.
+5. Configure `SUPERMEMORY_API_KEY` if the semantic checkpoint indicator should show `submitted`.
+6. Click **Judge demo → Reset demo state**.
+7. Use a browser zoom level where the graph and floating controls remain readable.
+8. Close unrelated tabs, terminals, dashboards, and developer tools before recording.
 
 ## 0:00–0:18 — Product thesis
 
@@ -82,6 +85,12 @@ Target runtime: **2:40–2:55**. Use only synthetic demo data.
 
 **Show:** prior fingerprint, current fingerprint, `Pending verifier`, and affected graph nodes.
 
+**Optional one-sentence reliability callout if the production source card is visible:**
+
+> If an official host blocks cloud refresh, Cristóvão preserves the retained hash and says refresh-blocked instead of pretending the evidence is fresh.
+
+Do not spend more than 5 seconds on this callout.
+
 ## 2:32–2:52 — Compare with the checkpoint
 
 **Action:** open **Journey memory → What changed?**
@@ -108,3 +117,5 @@ End on the JourneyGraph or evidence state.
 - Use the already-loaded evidence feed rather than waiting on network calls during the recording.
 - Close one right-side drawer before opening another.
 - State once that the document and source-change interactions are synthetic demo scenarios.
+- Do not open Render, GitHub, or environment-variable dashboards during the final recording.
+- Do not show API keys, internal Redis URLs, resource IDs, or real sensitive personal information.
