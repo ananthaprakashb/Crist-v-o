@@ -9,6 +9,7 @@
 .source-status { padding: 4px 7px; border-radius: 999px; background: #edf0ee; color: #65716c; font-size: 9px; text-transform: uppercase; }
 .source-status.first-snapshot, .source-status.unchanged { background: #e4f1e8; color: #356149; }
 .source-status.changed { background: #fff0df; color: #9a6033; }
+.source-status.refresh-blocked { background: #fff4d9; color: #7c6329; }
 .source-status.error { background: #fde9e6; color: #974943; }
 .source-grid h3 { margin: 13px 0 8px; font-size: 15px; }
 .source-details { margin: 0 0 13px; }
