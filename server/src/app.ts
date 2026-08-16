@@ -127,6 +127,12 @@ createServer(async (request, response) => {
       }
       const mimeType = typeof payload.mimeType === 'string' ? payload.mimeType : '';
       const data = typeof payload.data === 'string' ? payload.data : '';
+      if (mimeType && data && !process.env.GEMINI_API_KEY) {
+        return json(response, 503, {
+          error: 'document-extraction-unavailable',
+          message: 'Uploaded-document extraction is not configured on this deployment. Use the synthetic I-797 demo or ask the site administrator to enable document extraction.',
+        });
+      }
       return mimeType && data
         ? json(response, 200, await analyzeI797File(mimeType, data))
         : json(response, 400, { error: 'document-data-required' });
